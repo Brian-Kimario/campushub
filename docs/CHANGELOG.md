@@ -7,6 +7,29 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [Phase 8] — 2026-11-04 — Optional Kafka and transactional outbox
+
+**Status:** Implemented locally. Disabled by default (ADR-011). Not pushed in this entry.
+
+**Affected documents:** `docs/CHANGELOG.md` (this entry), `docs/MASTER_BLUEPRINT_COMPLIANCE.md` (FR-EVT-01 to 04, NFR-REL-01), `docs/PHASE_PLAN.md` (Phase 8 status).
+
+**Built:**
+- V16 migration: `outbox_events` (unpublished index on `published_at, created_at, id`) and `processed_events` (composite key `event_id, consumer`). No applied migration was changed.
+- Producer side: `OutboxService.record` writes an outbox row in the same transaction as the membership change (invitation received, accepted, declined, member removed) and the submission review. When disabled it writes nothing.
+- `OutboxRelay` publishes batches of 50 with `FOR UPDATE SKIP LOCKED`, keyed by aggregate ID for ordering, with an idempotent producer (`acks=all`). It stops at the first failure and records the attempt. Its batch runs in an explicit `TransactionTemplate`, because a self-invoked `@Transactional` method skips the proxy.
+- Consumer side: `EventConsumer` and `EventHandler` skip an event whose ID is already in `processed_events`, then apply it with `EventEffect`. Retries use exponential backoff. Unparseable messages and unrecoverable failures go to `campushub.events.DLT`.
+- Metrics: `campushub.outbox.published`, `campushub.outbox.publish.failures`, `campushub.events.processed`, `campushub.events.duplicates`, `campushub.events.dead_lettered`.
+- Local broker: `docker compose --profile kafka up -d` starts a pinned KRaft Kafka. The `api` service reads `CAMPUSHUB_KAFKA_BOOTSTRAP_SERVERS`.
+
+**Verified:**
+- `./mvnw -B verify` passed with 186 tests and 0 failures, including `OutboxServiceTest` (2), `KafkaFlowIntegrationTest` (4: exactly-once relay and apply, rollback of the outbox row with the change, transient consumer retry, DLT for an unparseable message).
+- The relay stamp bug found in the first run is fixed. Self-invoked `@Transactional` skipped the proxy, so the `published_at` update never committed and the same events were re-sent. The retry test's counter was also miscounted.
+
+**Not verified or not built:**
+- No DLT replay tooling. The Phase 8 gate needs "recovery" demonstrated, so the gate is not met yet.
+- No test exercises the `SUBMISSION_REVIEWED` outbox write. Its integration coverage is still optional work.
+- No run against a managed Kafka broker.
+
 ## [Phase G] — 2026-11-04 — Final local verification
 
 **Status:** Complete for local verification. Not pushed. The fix below is committed locally.

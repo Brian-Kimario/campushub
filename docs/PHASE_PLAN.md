@@ -17,7 +17,7 @@
 | 5 | Tasks, milestones, and calendar | Not started |
 | 6 | Submissions and faculty reviews | Not started |
 | 7 | Skills, certifications, and dashboards (P1) | Not started |
-| 8 | Optional Kafka and resilience extension (P2) | Not started; disabled by default |
+| 8 | Optional Kafka and resilience extension (P2) | Implemented locally, disabled by default; DLT replay not built |
 | 9 | Testing, security hardening, and performance | Not started |
 | 10 | CI/CD, deployment, and operational readiness | Not started |
 | 11 | Capstone demonstration and handoff | Not started |

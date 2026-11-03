@@ -148,10 +148,10 @@ The earlier summary said the MVP covers "P0 basics". That is only partly accurat
 | ID | Requirement | Status | Evidence | Remaining work | Priority |
 |---|---|---|---|---|---|
 | NOTIF-01 | Users see their own notifications with read state | Partial | V15 `notifications` table; `GET /notifications`, `/unread-count`, `POST /{id}/read`, `/read-all`; inbox page at `/notifications`; unread badge in the header | Covers invitation received, accepted, declined, and member removed only. Messages are rendered on read, so a project title change shows in old notifications. No delete. No notification for submission review or other events. Tests: `NotificationFlowIntegrationTest` (6). Browser flow: UNVERIFIED. | P2 |
-| FR-EVT-01 | Events written to `outbox_events` in the same transaction | Missing | No outbox table or code | Outbox migration and writes in the same transaction. | P2 |
-| FR-EVT-02 | Relay publishes to Kafka when enabled | Missing | No Kafka dependency in `pom.xml`; `application.yml` has a placeholder reference only | Relay and producer. | P2 |
-| FR-EVT-03 | Idempotent consumers | Missing | No `processed_events` | Consumer with unique event ID. | P2 |
-| FR-EVT-04 | Retry, backoff, DLQ | Missing | None | Retry and DLQ. | P2 |
+| FR-EVT-01 | Events written to `outbox_events` in the same transaction | Implemented | V16 `outbox_events`; `OutboxService.record` called inside the membership and submission transactions. `KafkaFlowIntegrationTest.failedWriteRollsBackTheOutboxRowWithTheChange` shows rollback leaves no row. | None found. | P2 |
+| FR-EVT-02 | Relay publishes to Kafka when enabled | Implemented | `OutboxRelay` (FOR UPDATE SKIP LOCKED, batched, explicit transaction); idempotent producer with `acks=all`; `KafkaFlowIntegrationTest` (Testcontainers Kafka). Off by default: `OutboxServiceTest` covers the disabled path. | Not run against a real managed broker. | P2 |
+| FR-EVT-03 | Idempotent consumers | Implemented | V16 `processed_events` keyed by (event_id, consumer); `EventHandler` skips duplicates. `invitationIsRelayedAndAppliedExactlyOnce` covers it. | None found. | P2 |
+| FR-EVT-04 | Retry, backoff, DLQ | Partial | `DefaultErrorHandler` with exponential backoff; `DeadLetterPublishingRecoverer` to `campushub.events.DLT`. `transientConsumerFailureIsRetriedUntilItApplies` and `unparseableMessageGoesToTheDeadLetterTopic` pass. | No replay tooling for the DLT yet; the Phase 8 demo needs replay. | P2 |
 
 ## 12. Non-functional requirements
 
@@ -170,7 +170,7 @@ The earlier summary said the MVP covers "P0 basics". That is only partly accurat
 | NFR-A11Y-01 | WCAG 2.1 AA for implemented screens | Partial | ARIA labels on calendar grid and navigation; no axe-core run | Automated axe check. | P0 |
 | NFR-OPS-01 | Health exposes only liveness and readiness | Partial | `/actuator/health/readiness` responds; `StorageHealthIndicator` exists | Confirm no component details publicly: UNVERIFIED. | P0 |
 | NFR-OPS-02 | Structured logs with request ID | UNVERIFIED | Not checked in this pass | Confirm log format. | P0 |
-| NFR-REL-01 | Core workflows work with Kafka disabled | Implemented | No Kafka runtime dependency | Kafka-disabled test profile: UNVERIFIED. | P0 |
+| NFR-REL-01 | Core workflows work with Kafka disabled | Implemented | `campushub.kafka.enabled` defaults to false; no outbox rows and no broker connection when off. The MySQL flow suites run with the flag off and pass. | Dedicated disabled-profile test: not added. | P0 |
 | NFR-TEST-01 | Reproducible tests locally and in CI | Implemented | `./mvnw -B verify` runs with Testcontainers MySQL (136 tests last run) | CI run: GitHub check is blocked by PR #1. | P0 |
 
 ## Planned order of work (from this audit)
