@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -246,5 +247,77 @@ class CertificationFlowIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         assertThat(JsonPath.<String>read(body, "$.credentialUrl")).isEqualTo("https://10.255.255.1/unreachable");
+    }
+
+    private static String editBody(int version, String title, String issuedOn, String expiresOn, String url) {
+        return """
+                {"version":%d,"title":"%s","issuer":"Amazon Web Services","issuedOn":"%s",
+                 "expiresOn":%s,"credentialId":"AWS-123","credentialUrl":%s}
+                """.formatted(version, title, issuedOn, expiresOn, url);
+    }
+
+    private ResultActions editCertification(String token, String id, String body) throws Exception {
+        return mockMvc.perform(put(CERTIFICATIONS + "/" + id).header(AUTHORIZATION, token)
+                .contentType("application/json")
+                .content(body));
+    }
+
+    @Test
+    void studentEditsOwnCertificationAndChangesPersist() throws Exception {
+        String student = tokenFor(account(Role.STUDENT));
+        String id = createdCertification(student);
+
+        editCertification(student, id, editBody(0, "Renamed Badge", "2026-03-14", "\"2027-03-14\"",
+                        "\"https://www.credly.com/badges/renamed\""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Renamed Badge"))
+                .andExpect(jsonPath("$.expiresOn").value("2027-03-14"))
+                .andExpect(jsonPath("$.credentialId").value("AWS-123"))
+                .andExpect(jsonPath("$.version").value(1));
+
+        mockMvc.perform(get(CERTIFICATIONS).header(AUTHORIZATION, student))
+                .andExpect(jsonPath("$.content[0].title").value("Renamed Badge"))
+                .andExpect(jsonPath("$.content[0].credentialId").value("AWS-123"))
+                .andExpect(jsonPath("$.content[0].version").value(1));
+
+        editCertification(student, id, editBody(0, "Stale Write", "2026-03-14", "null", "null"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("STALE_VERSION"));
+    }
+
+    @Test
+    void otherStudentCannotEditCertification() throws Exception {
+        String owner = tokenFor(account(Role.STUDENT));
+        String other = tokenFor(account(Role.STUDENT));
+        String id = createdCertification(owner);
+
+        editCertification(other, id, editBody(0, "Hijacked", "2026-03-14", "null", "null"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("NOT_FOUND"));
+    }
+
+    @Test
+    void editRefusesExpiryBeforeIssueAndNonHttpsLinks() throws Exception {
+        String student = tokenFor(account(Role.STUDENT));
+        String id = createdCertification(student);
+
+        editCertification(student, id, editBody(0, "Badge", "2026-03-14", "\"2025-01-01\"", "null"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+
+        editCertification(student, id, editBody(0, "Badge", "2026-03-14", "null", "\"http://example.com/badge\""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void facultyAndAdministratorsCannotEditCertifications() throws Exception {
+        String faculty = tokenFor(account(Role.FACULTY));
+        String student = tokenFor(account(Role.STUDENT));
+        String id = createdCertification(student);
+
+        editCertification(faculty, id, editBody(0, "Badge", "2026-03-14", "null", "null"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("FORBIDDEN_ROLE"));
     }
 }

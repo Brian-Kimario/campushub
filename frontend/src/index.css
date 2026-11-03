@@ -452,3 +452,86 @@ select[aria-invalid='true'] {
 .submission-card .banner {
   margin-top: 0.5rem;
 }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+
+.dashboard-block {
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dashboard-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+}
+
+.progress {
+  position: relative;
+  width: 100%;
+  max-width: 28rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+  margin: 0.5rem 0;
+}
+
+.progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent);
+}
+
+.progress-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: var(--text);
+}

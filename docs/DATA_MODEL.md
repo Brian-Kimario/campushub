@@ -1,7 +1,7 @@
 # CampusHub — Data Model
 
 **Purpose:** Authoritative relational schema: tables, keys, constraints, indexes, and invariants enforced by the database.
-**Scope:** MySQL 8 schema targeted by Flyway migrations V1–V8 (Phase 1–7). P2 tables are listed but not migrated until Phase 8.
+**Scope:** MySQL 8 schema targeted by Flyway migrations V1–V10 (Phases 1–9.1). P2 tables are listed but not migrated until Phase 8.
 **Last reviewed:** 2026-11-03 (Phase 0)
 **Related:** [ERD.md](ERD.md) (diagram), [STATE_MACHINES.md](STATE_MACHINES.md) (status values), [API_CONTRACT.md](API_CONTRACT.md).
 
@@ -256,7 +256,7 @@ Invariant: `decision = 'ACCEPTED' OR feedback IS NOT NULL` (CHECK). `UNIQUE (ver
 
 - `skills`: `id`, `name` VARCHAR(80) UNIQUE after normalization (trimmed, lowercased key in `name_key`), `category` VARCHAR(60), `active` BOOLEAN.
 - `user_skills`: PK `(user_id, skill_id)`, `proficiency` CHECK in (`BEGINNER`,`INTERMEDIATE`,`ADVANCED`,`EXPERT`), `evidence_note` VARCHAR(500) NULL, `updated_at`.
-- `certifications`: `id`, `owner_id` FK RESTRICT, `title` VARCHAR(200), `issuer` VARCHAR(200), `issued_on` DATE, `credential_url` VARCHAR(500) NULL CHECK (`credential_url IS NULL OR credential_url LIKE 'https://%'`), `created_at`. Index `ix_certs_owner (owner_id, issued_on)`.
+- `certifications`: `id`, `owner_id` FK RESTRICT, `title` VARCHAR(200), `issuer` VARCHAR(200), `issued_on` DATE, `expires_on` DATE NULL CHECK (`expires_on IS NULL OR expires_on >= issued_on`), `credential_id` VARCHAR(100) NULL CHECK (length 1–100 when present), `credential_url` VARCHAR(500) NULL CHECK (`credential_url IS NULL OR credential_url LIKE 'https://%'`), `created_at`, `version` INT NOT NULL DEFAULT 0 (`@Version` optimistic lock, see [API_CONTRACT.md](API_CONTRACT.md) §11). Index `ix_certs_owner (owner_id, issued_on)`.
 - `certification_files`: same columns as `submission_files` minus version link, with `certification_id` FK RESTRICT. Delete of a certification removes its file rows and storage objects in one transaction, after the database commit succeeds (see [ARCHITECTURE.md](ARCHITECTURE.md) §12).
 
 ## 9. Phase 8 tables (P2, not migrated before Phase 8)
@@ -290,6 +290,7 @@ Every list endpoint has a bounded page size and a sort allowlist. Phase 9 verifi
 | `V7__refresh_sessions.sql` | `refresh_sessions` for ADR-025 refresh cookies | 7 |
 | `V8__skills.sql` | `skills`, `user_skills` (Phase 5B) | 5B |
 | `V9__certifications.sql` | `certifications`; `certification_files` waits for the storage layer | 7a |
-| `V8__outbox.sql` | P2 tables | 8 |
+| `V10__certification_edit.sql` | `certifications.expires_on`, `credential_id`, `version`; expiry and credential ID CHECKs (V9 is applied, so no edit) | 9.1 |
+| `outbox_events` (P2) | Not migrated yet; planned for Phase 8 | 8 |
 
 Rules: migrations are never edited after merge; corrections are new migrations. Each migration has a rollback note in its header comment and a test that applies all migrations to an empty database (NFR-DATA-01).

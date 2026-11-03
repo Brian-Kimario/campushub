@@ -111,6 +111,9 @@ export interface Certification {
   title: string
   issuer: string
   issuedOn: string
+  expiresOn: string | null
+  credentialId: string | null
   credentialUrl: string | null
   createdAt: string
+  version: number
 }

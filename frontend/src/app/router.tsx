@@ -6,6 +6,7 @@ import { RequireAuth } from '../features/auth/RequireAuth'
 import {
   CertificationsPage,
   ChangePasswordPage,
+  DashboardPage,
   LoginPage,
   ProjectDetailPage,
   ProjectFormPage,
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Navigate to="/projects" replace /> },
+      { path: 'dashboard', element: lazyPage(<DashboardPage />) },
       { path: 'change-password', element: lazyPage(<ChangePasswordPage />) },
       { path: 'projects', element: lazyPage(<ProjectListPage />) },
       { path: 'projects/new', element: lazyPage(<ProjectFormPage />) },

@@ -7,5 +7,6 @@ export const ChangePasswordPage = lazy(() => import('../features/auth/ChangePass
 export const ProjectListPage = lazy(() => import('../features/projects/ProjectListPage'))
 export const ProjectDetailPage = lazy(() => import('../features/projects/ProjectDetailPage'))
 export const ProjectFormPage = lazy(() => import('../features/projects/ProjectFormPage'))
+export const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage'))
 export const SkillsPage = lazy(() => import('../features/skills/SkillsPage'))
 export const CertificationsPage = lazy(() => import('../features/certifications/CertificationsPage'))

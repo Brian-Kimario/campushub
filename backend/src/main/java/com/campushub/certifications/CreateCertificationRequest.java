@@ -14,5 +14,7 @@ public record CreateCertificationRequest(
         @NotBlank @Size(max = 200) String title,
         @NotBlank @Size(max = 200) String issuer,
         @NotNull LocalDate issuedOn,
+        LocalDate expiresOn,
+        @Size(max = 100) String credentialId,
         @Size(max = 500) @Pattern(regexp = "^https://\\S+$", message = "must be an https URL") String credentialUrl) {
 }

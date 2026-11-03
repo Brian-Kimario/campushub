@@ -65,6 +65,6 @@ const baseQueryWithSessionCheck: BaseQueryFn<string | FetchArgs, unknown, FetchB
 export const baseApi = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithSessionCheck,
-  tagTypes: ['Project', 'Task', 'Submission', 'Faculty', 'Skill', 'OwnSkill', 'Certification'],
+  tagTypes: ['Project', 'Task', 'Submission', 'Faculty', 'Skill', 'OwnSkill', 'Certification', 'Dashboard'],
   endpoints: () => ({}),
 })

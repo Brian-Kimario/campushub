@@ -10,8 +10,10 @@ import com.campushub.shared.web.PageResponse;
 import com.campushub.shared.web.Pagination;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
@@ -23,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Only a student reaches these endpoints, and only for their own rows. Any other role gets 403
  * FORBIDDEN_ROLE. A row that belongs to another student reads as NOT_FOUND (NS-01), so the response
- * does not reveal that it exists.
+ * does not reveal that it exists. An update with a stale version is refused with STALE_VERSION (409).
  */
 @Service
 public class CertificationService {
@@ -55,10 +57,29 @@ public class CertificationService {
     public CertificationResponse create(AuthenticatedUser caller, CreateCertificationRequest body,
                                         HttpServletRequest request) {
         requireStudent(caller);
+        requireValidDates(body.issuedOn(), body.expiresOn());
         var certification = new Certification(UUID.randomUUID(), caller.userId(), body.title(), body.issuer(),
-                body.issuedOn(), body.credentialUrl(), clock.instant());
+                body.issuedOn(), body.expiresOn(), body.credentialId(), body.credentialUrl(), clock.instant());
         certifications.saveAndFlush(certification);
         audit.record("certification.created", caller.userId(), CERTIFICATION, certification.getId().toString(),
+                AuditOutcome.SUCCESS, request, Map.of());
+        return CertificationResponse.from(certification);
+    }
+
+    @Transactional
+    public CertificationResponse update(AuthenticatedUser caller, UUID id, UpdateCertificationRequest body,
+                                        HttpServletRequest request) {
+        requireStudent(caller);
+        Certification certification = certifications.findByIdAndOwnerId(id, caller.userId())
+                .orElseThrow(CertificationService::notFound);
+        if (!Objects.equals(certification.getVersion(), body.version())) {
+            throw new ApiException(ErrorCode.STALE_VERSION, "This certification changed. Reload it and try again.");
+        }
+        requireValidDates(body.issuedOn(), body.expiresOn());
+        certification.update(body.title(), body.issuer(), body.issuedOn(), body.expiresOn(),
+                body.credentialId(), body.credentialUrl());
+        certifications.saveAndFlush(certification);
+        audit.record("certification.updated", caller.userId(), CERTIFICATION, id.toString(),
                 AuditOutcome.SUCCESS, request, Map.of());
         return CertificationResponse.from(certification);
     }
@@ -76,6 +97,13 @@ public class CertificationService {
     private static void requireStudent(AuthenticatedUser caller) {
         if (caller.role() != Role.STUDENT) {
             throw new ApiException(ErrorCode.FORBIDDEN_ROLE, "Your role cannot perform this action.");
+        }
+    }
+
+    /** An expiry date cannot come before the issue date. Refused with VALIDATION_FAILED (400). */
+    private static void requireValidDates(LocalDate issuedOn, LocalDate expiresOn) {
+        if (expiresOn != null && expiresOn.isBefore(issuedOn)) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "The expiry date cannot be before the issue date.");
         }
     }
 

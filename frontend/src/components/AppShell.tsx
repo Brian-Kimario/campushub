@@ -29,6 +29,7 @@ export function AppShell() {
       <header className="app-header">
         <span className="brand">CampusHub</span>
         <nav aria-label="Main">
+          {(user?.role === 'STUDENT' || user?.role === 'FACULTY') && <NavLink to="/dashboard">Dashboard</NavLink>}
           <NavLink to="/projects">Projects</NavLink>
           <NavLink to="/skills">Skills</NavLink>
           {user?.role === 'STUDENT' && <NavLink to="/certifications">Certifications</NavLink>}

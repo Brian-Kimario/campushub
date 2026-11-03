@@ -147,16 +147,29 @@ The seeded accounts do not require a password change. Use this step with an acco
 
 ### 3.9 Certifications (Phase 7a)
 
-1. Sign in as the student and open `/certifications`. Add a certification: a title, an issuer, an issue date, and a credential link starting with `https://`.
-   - Expected: it appears in "My certifications" with the issue date and a "View credential" link.
-2. Enter a credential link that starts with `http://` and submit.
+1. Sign in as the student and open `/certifications`. Add a certification: a title, an issuer, an issue date, an optional expiry date, an optional credential ID, and a credential link starting with `https://`.
+   - Expected: it appears in "My certifications" with the issue date, the expiry date, the credential ID, and a "View credential" link.
+2. Enter an expiry date earlier than the issue date and submit.
+   - Expected: the form refuses it and names the date rule. Nothing is saved.
+3. Enter a credential link that starts with `http://` and submit.
    - Expected: the form refuses it and names the `https://` rule. Nothing is saved.
-3. Delete the certification and confirm.
+4. Edit the certification: change the issuer or the expiry date and save. Reload the page.
+   - Expected: the changes persist after the reload. If another session saved the same certification first, the save is refused with "This certification changed. Reload it and try again."
+5. Delete the certification and confirm.
    - Expected: the list is empty again.
-4. Sign in as the administrator or faculty.
+6. Sign in as the administrator or faculty.
    - Expected: no "Certifications" navigation. The page shows that only students keep certifications.
 
 Evidence file upload is not part of this phase.
+
+### 3.10 Dashboards (Phase 10)
+
+1. Sign in as the student and open `/dashboard`.
+   - Expected: project, task, submission, skill, and certification counts. The task progress is a percentage of DONE tasks over all tasks, or "No tasks yet" when there are none. It never shows 100% for an empty project.
+2. Sign in as faculty and open `/dashboard`.
+   - Expected: only the projects this faculty member supervises, with the number of revisions awaiting review. Projects supervised by someone else do not appear.
+3. Sign in as the administrator.
+   - Expected: no "Dashboard" navigation. The page says the dashboard is for students and faculty.
 
 ## 4. Verification status
 
@@ -164,7 +177,11 @@ What was checked, and how. Anything not listed as verified was not demonstrated 
 
 | Area | Status | Evidence |
 |---|---|---|
-| `/api/v1` routing and auth | Verified | `./mvnw -B verify`, 97 tests, 0 failures |
+| `/api/v1` routing and auth | Verified | `./mvnw -B verify`, 125 tests, 0 failures, BUILD SUCCESS (Phases 9.1 and 10 included) |
+| Certification create with expiry date and credential ID; edit persists after reload; stale-version and expiry-before-issue refusals | Verified in browser for create and edit-after-reload. Refusals covered by `CertificationFlowIntegrationTest` (12 tests) | Built-in browser on `localhost:5173` as `student2`; dashboard certification count reads 1 from MySQL |
+| Student dashboard (empty state and certification count) | Verified in browser | Built-in browser; progress with tasks covered by `DashboardIntegrationTest` (5 tests) |
+| Faculty dashboard (supervised projects only, awaiting-review counts) | Verified in browser | Built-in browser as `faculty@campushub.local`: 2 supervised projects, 1 awaiting review each |
+| Student dashboard task progress with real tasks, admin dashboard message | Not verified in browser | Backend tests cover progress and role rules; the admin message is not checked in the UI |
 | Login (correct and wrong password), empty-field validation, `/projects` redirect without session | Verified in browser | Built-in browser pane |
 | Student project create, task create, transition to `IN_PROGRESS`, revision 1 and 2 submit | Verified in browser | Built-in browser pane |
 | Admin supervisor assignment | Verified in browser | Built-in browser pane |

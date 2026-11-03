@@ -232,11 +232,16 @@ Admin download: ADMIN has no path to student submission files in MVP (ADR-007). 
 | POST | `/admin/skills` | ADMIN | Add skill | 409 `DUPLICATE` on normalized name |
 | GET | `/users/me/skills` | STUDENT | Own skills | |
 | PUT | `/users/me/skills` | STUDENT | Replace full set atomically | Body: `[{skillId, proficiency, evidenceNote?}]`; max 50 entries |
-| GET | `/users/me/certifications` | owner | List own | Paginated |
-| POST | `/users/me/certifications` | owner | Create | 201; `credentialUrl` must be `https` (422 `VALIDATION_FAILED`) |
-| DELETE | `/users/me/certifications/{id}` | owner | Delete with file | 204; audited; 404 for non-owners |
-| POST | `/users/me/certifications/{id}/file` | owner | Upload evidence | 201; same validation as submission files |
-| GET | `/users/me/certifications/{id}/file` | owner | Download evidence | 200 attachment; 404 otherwise |
+| GET | `/users/me/certifications` | STUDENT | List own | Paginated |
+| POST | `/users/me/certifications` | STUDENT | Create | 201; body `title`, `issuer`, `issuedOn`, `expiresOn?`, `credentialId?` (max 100), `credentialUrl?` (must be `https`) |
+| PUT | `/users/me/certifications/{id}` | STUDENT | Edit own | 200; body as create plus `version`; stale `version` → 409 `STALE_VERSION`; `expiresOn` before `issuedOn` → 400 `VALIDATION_FAILED`; audited as `certification.updated`; 404 for non-owners |
+| DELETE | `/users/me/certifications/{id}` | STUDENT | Delete own | 204; audited; 404 for non-owners |
+| POST | `/users/me/certifications/{id}/file` | owner | Upload evidence | Not built in Phase 7a; see the MVP subset note |
+| GET | `/users/me/certifications/{id}/file` | owner | Download evidence | Not built in Phase 7a; see the MVP subset note |
+
+**MVP subset (Phase 7a and 9.1).** Certifications are STUDENT-only: other roles get 403 `FORBIDDEN_ROLE`. A non-https `credentialUrl` returns 400 `VALIDATION_FAILED`, the same status as every other field-value error on the API. The 422 status listed earlier for this rule was a planning error and is superseded here. Evidence file upload and download are deferred and are not implemented.
+
+**Dashboards (Phase 10).** The implemented MVP endpoints are `GET /users/me/dashboard/student` (STUDENT) and `GET /users/me/dashboard/faculty` (FACULTY). Any other role gets 403 `FORBIDDEN_ROLE`, and no token gets 401. The metrics are defined in the list below. `progressPercent` is DONE tasks over all tasks, or `null` when a student has no tasks, so an empty project never reads as complete. The admin dashboard and the `/dashboard/*` paths in the table below are not built.
 
 ## 12. Dashboards (read-only aggregates)
 

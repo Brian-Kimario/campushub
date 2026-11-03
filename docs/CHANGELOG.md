@@ -7,6 +7,28 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [Phase 9.1 and 10] — 2026-11-03 — Certification editing and dashboards
+
+**Status:** Complete locally. Not committed or pushed. No database reset, no edit to an applied migration.
+
+**Affected documents:** `docs/API_CONTRACT.md` §11 (certification rows, PUT endpoint, 400 decision for non-https links, MVP subset notes) and §12 (implemented dashboard endpoints), `docs/DATA_MODEL.md` (certifications columns, V10 row, outbox row corrected to "not migrated"), `docs/DEMO_SCRIPT.md` (§3.9 expiry, credential ID, edit; §3.10 dashboards; §4 verification), `docs/CHANGELOG.md` (this entry).
+
+**Changed (code):**
+- Flyway V10 adds `expires_on`, `credential_id`, and `version` to `certifications`. Expiry cannot precede the issue date; credential ID is 1–100 characters. V9 is unchanged.
+- `PUT /users/me/certifications/{id}` (STUDENT, optimistic lock). A stale `version` returns 409 `STALE_VERSION`; another student's row returns 404; other roles get 403. Audited as `certification.updated`.
+- Non-https `credentialUrl` returns 400 `VALIDATION_FAILED`, not the 422 the earlier contract listed. The contract is updated to match.
+- `GET /users/me/dashboard/student` and `GET /users/me/dashboard/faculty`. Metrics come from aggregate queries over MySQL. Progress is DONE over all tasks, or `null` when a student has no tasks, so an empty project never reads as complete. Faculty sees only projects they supervise. Any other role gets 403.
+- Frontend: certification add and inline edit forms; a Dashboard page at `/dashboard` for students and faculty, with a nav link for those roles. `/` still redirects to `/projects`.
+
+**Verified:**
+- `./mvnw -B verify`: 125 tests, 0 failures, BUILD SUCCESS. Includes 12 certification tests and 5 dashboard tests.
+- `npm run build` and `npx oxlint`: exit 0.
+- Built-in browser, local stack: certification create with expiry and credential ID; edit persists after a reload; student dashboard shows the certification count from the database; faculty dashboard shows only supervised projects.
+
+**Not verified:** the student dashboard with real tasks in the browser (covered by backend tests); the admin dashboard message in the browser; the certification stale-version and date refusals in the browser (covered by backend tests).
+
+**Known limit:** evidence file upload and download are still not built.
+
 ## [Phase 7a certifications] — 2026-11-03 — Owner-private certification records
 
 **Status:** Complete locally. Not committed or pushed. Evidence files are not included.
