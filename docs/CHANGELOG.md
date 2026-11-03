@@ -7,6 +7,34 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [Phase E.1 and E.5] — 2026-11-03 — Task assignment and task pagination
+
+**Status:** Complete locally. Not pushed. Not committed at the time of writing.
+
+**Affected documents:** `docs/CHANGELOG.md` (this entry), `docs/MASTER_BLUEPRINT_COMPLIANCE.md` (FR-TASK-02 and FR-TEAM-03 rows, planned order). Code: `backend/src/main/resources/db/migration/V12__task_assignee.sql`.
+
+**Changed (code):**
+- Flyway V12 adds `tasks.assignee_id` (nullable foreign key to `users`, `ON DELETE RESTRICT`) and index `ix_tasks_project_assignee`. No existing row is changed; existing tasks stay unassigned.
+- `POST /projects/{id}/tasks` and `PATCH /tasks/{id}` accept `assigneeId`. The assignee must be the project owner or an active team member, otherwise 422 `PRECONDITION_NOT_MET`. The PATCH is full-field, so `null` unassigns. `assigneeId` is returned in task responses.
+- Removing a member clears that member's assignment on open tasks in the same transaction (`TaskRepository.unassignOpenTasks`). DONE tasks keep their assignee and their version. Each cleared task has its version incremented.
+- Frontend: the task form has an assignee select, populated from the team list. The select stays disabled until the team list loads, and the current assignee is kept while it is not loaded, so a failed load cannot unassign a task. Task cards show the assignee's name or "Unassigned".
+- Frontend: the task list fetches one page at a time (20 per page) with Previous and Next controls. The earlier 50-task cap and "hidden tasks" text are removed, so no task is hidden.
+
+**Verified:**
+- `./mvnw -B verify`: 138 tests, 0 failures, BUILD SUCCESS. Includes `assigneeMustBeTheOwnerOrAnActiveMemberAndNullUnassigns` and `removingAMemberClearsOnlyTheirOpenAssignments` in `TaskFlowIntegrationTest`.
+- `npm run build` (`tsc -b` and `vite build`) and `npm run lint`: exit 0.
+- Built-in browser, local stack rebuilt with V12 applied to the existing database (`Successfully applied 1 migration ... now at version v12`): as the task owner, the task was edited to assign Dev Student Two, saved, and the card then read "Assignee Dev Student Two".
+
+**Not verified:**
+- The pager in the browser. The demo project has one task, so the controls do not render. Pagination is not covered by a backend test in this change either.
+- Assignment removal through the UI (the backend test covers the cascade on member removal).
+
+**Known gaps:**
+- No task-list filter by assignee or milestone.
+- Deactivated users: no user deactivation endpoint exists (FR-PROF-04), so a deactivated user's assignment is not handled.
+
+**Environment note:** the demo task "Write literature review" was assigned to Dev Student Two during the browser check. This is local seed data, not reset.
+
 ## [Phase A] — 2026-11-03 — Browser end-to-end verification and phone-width fix
 
 **Status:** Complete locally. Committed on `phase-7a-certifications` (`199e1a4` header nav fix). Not pushed.
