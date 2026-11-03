@@ -7,6 +7,79 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [MVP Stage 4 follow-up] — 2026-11-03 — `/api/v1` migration, lint, browser verification, demo script
+
+**Status:** Complete locally. Committed locally in four commits (`/api/v1` and identity, MVP backend slices, frontend, docs); not pushed. See `git log`.
+
+**Affected documents:** `docs/IMPLEMENTATION_LOG.md` (§11 Stage 4 follow-up entry), `docs/DEMO_SCRIPT.md` (rewritten for the local MVP), `docs/CHANGELOG.md` (this entry).
+
+**Changed (code):**
+- All REST controllers are served under `/api/v1` through `backend/src/main/java/com/campushub/shared/web/ApiVersionConfig.java`. Actuator and springdoc stay outside the prefix.
+- Security matchers, the password-change exemptions, and the backend integration tests use `/api/v1` paths.
+- `frontend/src/api/baseApi.ts` uses `/api/v1`. `frontend/vite.config.ts` forwards `/api` unchanged to `CAMPUSHUB_API_TARGET` (default `http://localhost:8080`).
+- Lint fixes: lazy page exports moved to `frontend/src/app/lazyPages.ts`, so `only-export-components` passes; `watch` replaced with `useWatch` in five forms, so `incompatible-library` passes.
+
+**Resolved from the Stage 4 entry:** the root-route deviation (controllers at `/auth`, `/projects`, `/users`) is resolved by the migration above. The stale Compose `api` container is rebuilt from current source.
+
+**Verified:**
+- `./mvnw -B verify`: 89 tests, 0 failures, BUILD SUCCESS.
+- `npm run build` passes. `npm run lint` exits 0 with no warnings reported (was 0 errors and 11 warnings).
+- Compose `api` rebuilt from current source; readiness reports `UP`. The four seeded accounts log in through `/api/v1`. No volume was removed and the database was not reset.
+- Latest GitHub Actions run on `98e9b7b` (Phase 2 commit) succeeded, 3m10s. This run predates the Stage 4 follow-up changes, which have not been pushed.
+- Built-in browser pane, React UI: login (correct and wrong password), empty-field validation, `/projects` redirect without a session, student project create, task create and `IN_PROGRESS` transition, submissions for revision 1 and revision 2, admin supervisor assignment, faculty review start, changes requested with feedback, student sees the feedback, password change (old rejected, new accepted, original restored), session end on reload.
+
+**Not verified in the browser:** student attempts at admin actions and cross-user access; task transitions beyond `IN_PROGRESS`; `BLOCKED` and reset flows; project archive; faculty acceptance of revision 2; pagination past 50 tasks. The backend suite covers the rules behind several of these; the UI paths are not clicked through.
+
+**Open:**
+- Sign-out sometimes needs a second attempt in the built-in browser pane. Not investigated.
+- Stage 6 (full E2E run) is not started.
+
+## [MVP Stage 4] — 2026-11-03 — React frontend
+
+**Status:** Frontend slice built and smoke-tested locally. Not committed, not pushed, not deployed. Interactive UI flows are not yet clicked through end to end. Stage 5 and the full E2E run (Stage 6) are not started.
+
+**Affected documents:** `docs/IMPLEMENTATION_LOG.md` (§11 Stage 4 entry).
+
+**Added (code):** `frontend/` (Vite 8, React 19, TypeScript, Redux Toolkit with RTK Query, React Router, React Hook Form with Zod 4). Screens: login, forced password change, project list, project create and edit, project detail, admin supervisor assignment and archive, tasks (list, create, edit, transitions with `blockedReason`), submissions (list, create revision, faculty review start and decision). Access token held in memory only.
+
+**Changed (code):** `frontend/vite.config.ts` reads `CAMPUSHUB_API_TARGET` (default `http://localhost:8080`) so the dev proxy can target another local backend port.
+
+**Verified:**
+- `npm run build` passes (`tsc -b` and `vite build`).
+- `npm run lint` reports 0 errors and 11 warnings: `only-export-components` on the lazy route constants in `src/app/router.tsx`, and `incompatible-library` on React Hook Form `watch` calls. Not yet addressed.
+- Against the current backend source on port 8081 through the Vite `/api` proxy: login returns 401 for a wrong password and 200 for the three seeded roles; project create 201 and list 200; task create and `TODO`→`IN_PROGRESS` transition 200; `BLOCKED` without a reason 400; submission create 201; admin supervisor assignment 200; faculty review start 200; `CHANGES_REQUESTED` without feedback 422; with feedback 201; student revision 2 after changes requested 201; second decision 409; admin task create 403.
+- `/login` renders in the built-in browser with no console errors.
+
+**Not verified:** Form submissions, dialogs, stale-version recovery, and session reload through the React UI. Password change through the UI.
+
+**Open:**
+- The API contract base path is `/api/v1` (API_CONTRACT header and DECISIONS ADR on errors and versioning). The backend controllers are mounted at the root (`/auth`, `/projects`, `/users`). The frontend uses `/api` and the proxy strips it. This is a contract deviation that needs a decision: change the backend mapping to `/api/v1`, or record the root mapping as a deviation.
+- The Compose `api` container on port 8080 is stale. It returns 404 for `/auth/login`, so it does not run the current code. It was not stopped or rebuilt.
+
+## [MVP Stage 3] — 2026-11-03 — Submissions and review
+
+**Status:** Backend slice complete locally, verified by `./mvnw -B verify` (89 tests, 0 failures, BUILD SUCCESS). Not committed, not pushed, not deployed. The React frontend is not started.
+
+**Affected documents:** `docs/IMPLEMENTATION_LOG.md` (§11 Stage 3 entry), `docs/API_CONTRACT.md` (§10 MVP-subset note), `docs/DATA_MODEL.md` (§7 deviation note).
+
+**Added (code):** `V6__submissions.sql` (written; applied only in Testcontainers runs); submission package (create revision, list, get, review start, decision); `ErrorCode` additions `REVIEW_EXISTS` and `FEEDBACK_REQUIRED`.
+
+**Tests:** `SubmissionFlowIntegrationTest` (13), on MySQL 8.4 via Testcontainers.
+
+**Deviations:** recorded in IMPLEMENTATION_LOG §11 and API_CONTRACT §10.
+
+## [MVP Stages 1–2] — 2026-11-03 — Projects and tasks
+
+**Status:** Backend slice complete locally, verified by `./mvnw -B verify` (76 tests, 0 failures, BUILD SUCCESS). Not committed, not pushed, not deployed. Submissions, review, and the React frontend are not started.
+
+**Affected documents:** `docs/IMPLEMENTATION_LOG.md` (§11), `docs/API_CONTRACT.md` (§6 and §8 MVP-subset notes), `docs/DATA_MODEL.md` (§6.2 deviation note), `docs/SECURITY.md` (password-policy wording corrected).
+
+**Added (code):** `V4__projects.sql` and `V5__tasks.sql` (written; applied only in Testcontainers runs); project package (create, list, get, owner PATCH, admin supervisor assignment, admin archive); task package (create, list, get, owner PATCH, owner transitions with audit actions); `GET /users/faculty` (admin only); `ErrorCode` additions `FIELD_NOT_EDITABLE`, `INVALID_TRANSITION`.
+
+**Tests:** `ProjectFlowIntegrationTest` (13) and `TaskFlowIntegrationTest` (15), both on MySQL 8.4 via Testcontainers.
+
+**Deviations:** recorded in IMPLEMENTATION_LOG §11.
+
 ## [Phase 1] — 2026-11-03 — Local infrastructure and backend skeleton
 
 **Status:** Complete locally. Committed locally, not pushed. CI workflow validated locally, not run on GitHub (no remote). Stopped for approval before Phase 2.

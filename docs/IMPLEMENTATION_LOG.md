@@ -188,3 +188,87 @@ Owner acceptances of risks in RISKS (status *Accepted*) and answers to OD-1 to O
 - Decisions, risks, or owner items affected:
   - ADR-003 (HS256, 15-minute TTL, strict validation), ADR-005 (BCrypt 12), ADR-006 (resource policy), ADR-019 (revocation and `revoked_after`), ADR-020 (lockout 5 failures, 15 minutes, 20 per minute per address), ADR-021 (roles), ADR-023 (audit) are implemented as written above.
   - Not yet updated in this change: PHASE_PLAN status, RISKS evidence (R-02, R-03, R-05), CHANGELOG (no file exists yet), API_CONTRACT §3 (new codes need adding there, per ADR-012), and DATA_MODEL deviation notes. These are open items for the Phase 2 review.
+
+## 10. Phase 2 review follow-ups (BCrypt limit)
+
+Earlier documents cite this section for the Phase 2 deviations and the password limit. The Phase 2 deviations themselves are listed in the Phase 2 entry under §9.
+
+- **BCrypt 72-byte limit (Stage 0 fix).** BCrypt reads only the first 72 bytes of input, so the old 128-character maximum could silently truncate a password. `PasswordPolicy` now requires 12 to 72 UTF-8 bytes. `AuthService.matchesPassword` refuses any candidate longer than 72 bytes before comparing, so an over-long value cannot match on its first 72 bytes.
+- **Verified:** `PasswordPolicyTest` (4 unit tests); `AuthFlowIntegrationTest.changePasswordRejectsAReplacementLongerThanBcryptCanHold` (400 `VALIDATION_FAILED` on `newPassword`).
+- **Not verified:** a login attempt with a 73-byte password against a 72-byte prefix of a stored hash, through the HTTP layer. The guard is unit-level only.
+- **Outstanding:** the Compose API image was built before these changes and has not been rebuilt or smoke-tested (Stage 0 remainder).
+
+## 11. MVP vertical slice: Stage 1 projects (reduced)
+
+### 2026-11-03 — Stage 1: project create, read, update, supervisor, archive
+
+- **Built:** migration `V4__projects.sql` (written; applied only in Testcontainers runs, so no shared environment has it yet); `Project`, `ProjectStatus`, `ProjectRepository`, `ProjectService`, `ProjectController`; request and response records; `PageResponse` and `Pagination` in `shared/web`; `UserDirectoryController` with `GET /users/faculty`; `ErrorCode` additions `STALE_VERSION`, `PROJECT_ARCHIVED`, `SUPERVISOR_NOT_ELIGIBLE`; `GlobalExceptionHandler` mappings for a bad path or query type (404 for a path value, 400 for a query value) and for optimistic-lock failures (409 `STALE_VERSION`).
+- **Verified:** `./mvnw -B verify` on JDK 21: 61 tests, 0 failures, BUILD SUCCESS. `ProjectFlowIntegrationTest` (13 tests, MySQL 8.4 via Testcontainers) covers: student create returns ACTIVE with owner set; title "ab" and whitespace-only title return 400; due date before start date returns field `dueDate`; faculty create returns 403 `FORBIDDEN_ROLE`; student list shows only own projects; another student's GET returns the same 404 body as a missing id; faculty sees a project only after admin assigns them; admin assigns an active faculty supervisor; a student as supervisor returns 422 `SUPERVISOR_NOT_ELIGIBLE`; non-admin assign returns 403 `FORBIDDEN_ROLE`; owner PATCH with the current version increments `version`; PATCH with a stale version returns 409 `STALE_VERSION`; supervisor PATCH returns 403 `FORBIDDEN_STATE`; only admin can archive; PATCH on an archived project returns 422 `PROJECT_ARCHIVED`; `status=NOPE` and `size=500` return 400; `/users/faculty` returns 403 for a student and 200 with the active faculty for an admin.
+- **Deviations** (also stated in API_CONTRACT §6):
+  - Project status is `ACTIVE` or `ARCHIVED` only. The DRAFT, PROPOSED, APPROVED, REJECTED, and COMPLETED lifecycle and its endpoints are deferred.
+  - No `termId`, `courseId`, members, invitations, milestones, or `role` and `supervisorId` list filters. `subject` is added as an optional field.
+  - `PATCH` is allowed only while the project is `ACTIVE` and only for the owner. It uses full-field semantics: an omitted optional field is cleared.
+  - Archive moves `ACTIVE` to `ARCHIVED`, not the contract's COMPLETED or REJECTED sources, because those states do not exist yet.
+  - `GET /users/faculty` is not in the full contract. It is admin-only and unpaginated, to support choosing a supervisor. Pagination for it is deferred.
+  - A malformed `{id}` such as `not-a-uuid` returns 404 `NOT_FOUND`, the same as a missing one. The contract does not state this case.
+- **Not verified:**
+  - Concurrent writes. The stale-version case is tested sequentially. The `ObjectOptimisticLockingFailureException` mapping is compiled and wired, but no test forces a real race.
+  - The Compose stack with this build. The image is not rebuilt.
+  - The GitHub CI run (R-22).
+
+### 2026-11-03 — Stage 2: tasks (reduced)
+
+- **Built:** migration `V5__tasks.sql` (written; applied only in Testcontainers runs); `Task`, `TaskStatus`, `TaskPriority`, `TaskTransitions` (legal moves and their audit actions), `TaskRepository`, `TaskService`, `TaskController`; request and response records. Audit actions: `task.created`, `task.updated`, and the transition actions (`task.started`, `task.blocked`, `task.review_requested`, `task.reset`, `task.completed`, `task.returned`, `task.unblocked`, `task.reopened`).
+- **Verified:** `./mvnw -B verify` on JDK 21: 76 tests, 0 failures, BUILD SUCCESS (suite includes `TaskFlowIntegrationTest`, 15 tests, MySQL 8.4 via Testcontainers). The test covers: owner create returns TODO with MEDIUM priority and `createdBy`; `title` "ab" and `priority` "URGENT" return 400 `VALIDATION_FAILED`; faculty create returns 403 `FORBIDDEN_STATE`; a non-visible project's task list returns 404; the list is ordered by creation time, `status` filters, and `status=NOPE` returns 400; supervisor reads the list and a task; a hidden task returns the same 404 body as a missing one; `/tasks/not-a-uuid` returns 404; PATCH with `status` returns 400 `FIELD_NOT_EDITABLE`, and a valid PATCH increments `version`; the happy path TODO→IN_PROGRESS→IN_REVIEW→DONE sets `completedAt`, and DONE→IN_PROGRESS clears it; BLOCKED without a reason returns 400 on `blockedReason`, and unblocking clears the reason; TODO→DONE and same-state moves return 409 `INVALID_TRANSITION`; a stale version returns 409 `STALE_VERSION` before the transition is checked; supervisor transition returns 403 `FORBIDDEN_STATE`; an archived project refuses create and transition with 422 `PROJECT_ARCHIVED` and leaves the task unchanged.
+- **Deviations** (also stated in API_CONTRACT §8 and DATA_MODEL §6.2):
+  - No `milestone_id` and no `assignee_id`. The owner is the only actor, so every transition in STATE_MACHINES §3.2 is performed by the owner, and the assignee role is absent.
+  - The due column is `due_date DATE`, not `due_at`. `completed_at` is added.
+  - The archived-project refusal uses `PROJECT_ARCHIVED` (422), not the contract's `PROJECT_NOT_EDITABLE`, because the project status is `ACTIVE` or `ARCHIVED` only.
+  - Create, PATCH, and transitions are owner-only. A visible non-owner gets 403 `FORBIDDEN_STATE`. An invisible task or project gets 404.
+  - Order of checks for writes: visibility, owner, archived, version, then transition legality, then the BLOCKED reason check.
+  - Task list filters are `status` only. `dueBefore`, `assigneeId`, `milestoneId`, and the comment endpoints are not built.
+- **Not verified:**
+  - The audit rows written for `task.created`, `task.updated`, and the transition actions. The tests check API responses, not audit content.
+  - Concurrent writes. The stale-version case is tested sequentially.
+  - The Compose stack with this build. The image is not rebuilt.
+  - The GitHub CI run (R-22).
+  - Submissions and review (V6 is written but not applied or tested), and the React frontend.
+
+### 2026-11-03 — Stage 3: submissions and review (reduced)
+
+- **Built:** migration `V6__submissions.sql` (written; applied only in Testcontainers runs); `SubmissionStatus`, `ReviewDecision`, `Submission`, `SubmissionRepository`, `SubmissionService`, `SubmissionController`; request and response records. `ErrorCode` additions `REVIEW_EXISTS` (409) and `FEEDBACK_REQUIRED` (422), both also in API_CONTRACT §3. Audit actions: `submission.created`, `submission.review_started`, `submission.accepted`, `submission.changes_requested`.
+- **Verified:** `./mvnw -B verify` on JDK 21: 89 tests, 0 failures, BUILD SUCCESS. `SubmissionFlowIntegrationTest` (13 tests, MySQL 8.4 via Testcontainers) covers: owner creates revision 1 as SUBMITTED with no reviewer and no feedback, and `version` 0; an `http://` link returns 400 `VALIDATION_FAILED`; a non-visible project's submission list returns 404; a hidden submission returns the same 404 body as a missing one; faculty create returns 403 `FORBIDDEN_STATE`; the supervisor reads the submission and list, and another faculty member gets 404; admin review returns 403 `FORBIDDEN_ROLE`; review start moves SUBMITTED to UNDER_REVIEW and records the reviewer, and a second start returns 409 `INVALID_TRANSITION`; a decision before the review starts returns 409 `INVALID_TRANSITION`; CHANGES_REQUESTED with blank feedback returns 422 `FEEDBACK_REQUIRED`; the decision is recorded with feedback and reviewer, a second decision returns 409 `REVIEW_EXISTS`, the owner sees the feedback, the next revision is 2, and a create while SUBMITTED returns 409 `INVALID_TRANSITION`; ACCEPTED is final and blocks a new revision; an archived project refuses create and review start with 422 `PROJECT_ARCHIVED` and leaves the submission SUBMITTED.
+- **Deviations** (also stated in API_CONTRACT §10 and DATA_MODEL §7):
+  - One `submissions` row per revision. No DRAFT, no `submission_versions`, no `submission_files`, no `reviews` table. The decision lives on the row.
+  - The link is an `https://` URL. There is no file upload, download, or storage. The `submission-files` endpoints are not built.
+  - Routes are project-scoped (`/projects/{id}/submissions`, `/submissions/{id}`, `/submissions/{id}/review*`), not milestone-scoped. There is no milestone and no `/versions` endpoint.
+  - Check order for writes: role (403 `FORBIDDEN_ROLE`) first for review actions, then visibility (404), then owner for create (403 `FORBIDDEN_STATE`), then archived (422), then state (409), then the feedback check (422). Review start and decision carry no `version`, so no 409 `STALE_VERSION` is produced.
+  - The reviewer is recorded at review start and reassigned to the caller who records the decision.
+  - The submission list is unpaginated and ordered by `revisionNo` ascending.
+- **Not verified:**
+  - Concurrent duplicate revisions. Two simultaneous creates for the same `revision_no` should hit `uk_submissions_revision`, but no test forces the race. The exception may surface as 500 rather than 409 and is untested.
+  - Audit row content for the submission actions. The tests check API responses, not the audit table.
+  - The Compose stack with this build. The image is not rebuilt.
+  - The GitHub CI run (R-22).
+  - The React frontend (Stage 4).
+
+### 2026-11-03 — Stage 4: React frontend (partial verification)
+
+- **Built:** `frontend/` with API client on RTK Query (`src/api/`), in-memory auth slice, protected routes, and feature folders for auth, projects, tasks, and submissions. Task panel: list (first 50, with a hint when more exist), create, edit, the ten transitions from STATE_MACHINES §3.2, `blockedReason` 3–500 characters for `BLOCKED`. Submission panel: list, create revision (owner, only when none exists or changes were requested), review start, and decision with feedback required for `CHANGES_REQUESTED`.
+- **Verified:** `npm run build` passes. `npm run lint` shows 0 errors and 11 warnings (see CHANGELOG `MVP Stage 4`). Backend smoke flow through the Vite proxy on the current source, port 8081: see CHANGELOG `MVP Stage 4` for the list of status codes checked.
+- **Not verified:** UI click-through of forms, dialogs, stale-version recovery, and reload. No E2E run (Stage 6).
+- **Deviations:**
+  - Task list shows the first 50 tasks, with no paging control. The API supports `page` and `size`.
+  - Backend controllers are mounted at the root, not `/api/v1` as API_CONTRACT and DECISIONS state. The frontend calls `/api` and the dev proxy strips the prefix. Open decision recorded in CHANGELOG.
+- **Environment note:** the Compose `api` container on 8080 predates the current code. Local verification used `./mvnw spring-boot:run` with the `dev` profile on 8081 against the Compose MySQL.
+
+### 2026-11-03 — Stage 4 follow-up: `/api/v1`, lint, browser verification, demo script
+
+- **Built:** all REST routes moved under `/api/v1` (`shared/web/ApiVersionConfig.java`); security matchers, password-change exemptions, and backend tests updated to match. Frontend base URL is `/api/v1`; the Vite proxy forwards `/api` unchanged. `docs/DEMO_SCRIPT.md` rewritten for the local MVP.
+- **Lint:** lazy page exports moved to `src/app/lazyPages.ts`; React Hook Form `watch` replaced with `useWatch` in five forms. `npm run lint` exits 0 with no warnings reported.
+- **Verified:** `./mvnw -B verify` (89 tests, 0 failures). `npm run build` passes. Compose `api` rebuilt from current source; readiness `UP`; the four seeded accounts log in through `/api/v1`. No Docker volume removed; database not reset.
+- **Verified in the built-in browser pane, React UI:** login (correct and wrong password), empty-field validation, redirect without session, student project and task create with `IN_PROGRESS` transition, revisions 1 and 2 submitted, admin supervisor assignment, faculty review start with changes requested and feedback, student sees the feedback, password change and restore, session end on reload.
+- **Not verified in the browser:** student attempts at admin actions and cross-user access; transitions beyond `IN_PROGRESS`; `BLOCKED` and reset flows; project archive; faculty acceptance of revision 2; pagination past 50 tasks. Listed in `docs/DEMO_SCRIPT.md` §4.
+- **Resolved deviation:** the root-route mapping recorded in the Stage 4 entry above is closed by the `/api/v1` migration.
+- **Open:** sign-out sometimes needs a second attempt in the browser pane (not investigated). Stage 6 E2E run not started.
+- **CI:** latest GitHub Actions run on `98e9b7b` succeeded (run 41591794252). The follow-up changes are not pushed, so they have no CI run yet.

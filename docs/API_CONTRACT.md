@@ -52,7 +52,7 @@ For private resources the response to a caller without access is 404 `NOT_FOUND`
 
 `user` summary: `{id, email, institutionalId, displayName, role, status, mustChangePassword, departmentId}`. Never includes `password_hash` or lockout fields.
 
-Password policy: 12–128 characters; must differ from the last password; rejects values on a bundled list of common passwords (SECURITY §3).
+Password policy: at least 12 characters and at most 72 UTF-8 bytes (the BCrypt input limit, ADR-005; IMPLEMENTATION_LOG §10); must differ from the last password; rejects values on a bundled list of common passwords (SECURITY §3).
 
 Gate: while `mustChangePassword` is true, every endpoint except `/auth/me`, `/auth/logout`, and `/auth/change-password` returns 403 `PASSWORD_CHANGE_REQUIRED`.
 
@@ -114,6 +114,7 @@ Problem type URI: `urn:campushub:problem:<code lower-kebab>`, e.g. `urn:campushu
 | POST | `/admin/users/{id}/reactivate` | ADMIN | Reactivate | 200 |
 | POST | `/admin/users/{id}/reset-password` | ADMIN | New temporary password | 201 with `temporaryPassword`; sets `mustChangePassword=true`; revokes existing tokens |
 | PATCH | `/admin/users/{id}` | ADMIN | Edit profile fields and `departmentId` | Role change returns 422 `ROLE_CHANGE_NOT_SUPPORTED` in MVP |
+| GET | `/users/faculty` | ADMIN | Active faculty for choosing a supervisor | MVP addition, not in the full contract. Returns a plain array of `{id, displayName}`, unpaginated (IMPLEMENTATION_LOG §11). Other roles get 403 `FORBIDDEN_ROLE` |
 
 ## 5. Catalog endpoints
 
@@ -131,6 +132,16 @@ Problem type URI: `urn:campushub:problem:<code lower-kebab>`, e.g. `urn:campushu
 Catalog GET responses are cached (ADR-010). Every admin write evicts the affected cache name.
 
 ## 6. Project endpoints
+
+**MVP subset (Stage 1, IMPLEMENTATION_LOG §11).** Only the rows below are implemented. Everything else in this section is deferred and must not be documented as available. Deviations from the full rows:
+
+- Project status is `ACTIVE` or `ARCHIVED` only. There is no DRAFT, PROPOSED, APPROVED, REJECTED, or COMPLETED state, so the lifecycle endpoints (`submit-proposal`, `revise`, `approve`, `reject`, `activate`, `complete`) are not implemented.
+- `POST /projects` takes `title`, `description?`, `subject?`, `startDate?`, `dueDate?`. `termId` and `courseId` are not implemented. `dueDate` before `startDate` returns 422 `VALIDATION_FAILED` with field `dueDate`. Create is 400 `VALIDATION_FAILED` for invalid input, and is STUDENT only.
+- `PATCH /projects/{id}` is owner-only and works on `ACTIVE` projects. Full-field semantics: an omitted optional field is cleared. Stale `version` returns 409 `STALE_VERSION`; an archived project returns 422 `PROJECT_ARCHIVED`, which is checked before the version.
+- `PUT /projects/{id}/supervisor` takes `{supervisorId, version}`. It is ADMIN only, and the supervisor must be an active FACULTY account.
+- `POST /projects/{id}/archive` is ADMIN only, takes `{version}`, and moves `ACTIVE` to `ARCHIVED`. Archived projects are read-only.
+- The `GET /projects` filter is `status` only. `termId`, `role`, and `supervisorId` filters are not implemented. Sort is `createdAt,desc` with `id,desc` as the tie-breaker. Invalid `status` or `size` values return 400 `VALIDATION_FAILED`.
+- A malformed `{id}` path value returns 404 `NOT_FOUND`, the same as a missing one.
 
 | Method | Path | Who | Purpose | Success | Notes |
 |---|---|---|---|---|---|
@@ -184,6 +195,8 @@ Invitations expire 14 days after creation. Expiry is applied on read and by an h
 
 Task `status` is never writable through `PATCH /tasks/{id}`; sending it there returns 400 `FIELD_NOT_EDITABLE` (FR-TASK-03).
 
+**MVP subset (IMPLEMENTATION_LOG §11, Stage 2).** Implemented: list (filter `status` only; sort `createdAt,asc`, `id,asc`), create (owner only; default priority `MEDIUM`; archived project → 422 `PROJECT_ARCHIVED`, not `PROJECT_NOT_EDITABLE`), detail, PATCH (owner only; `title`, `description`, `priority`, `dueDate`; `version` required), and transitions (owner only; `blockedReason` required for `BLOCKED` and cleared on any other transition; an illegal or same-state move → 409 `INVALID_TRANSITION`). Deviations: the request field is `dueDate`, not `dueAt`; `assigneeId`, `milestoneId`, `dueBefore`, and the comment endpoints are not built. The assignee role is absent, so the owner performs every transition.
+
 ## 9. Calendar
 
 | Method | Path | Who | Purpose |
@@ -206,6 +219,8 @@ Rules: `from` and `to` required; `to >= from`; range ≤ 92 days (400 `RANGE_TOO
 | POST | `/submission-versions/{versionId}/review/start` | supervisor | SUBMITTED → UNDER_REVIEW | 200 | Other users → 404 (not supervisor of project) |
 | POST | `/submission-versions/{versionId}/review` | supervisor | Record decision | 201 | Body `decision`, `feedback?`; 422 `FEEDBACK_REQUIRED`; 409 `REVIEW_EXISTS`; requires UNDER_REVIEW (409 `INVALID_TRANSITION` otherwise) |
 | GET | `/submission-files/{fileId}/download` | member, supervisor, admin (see matrix) | Stream bytes | 200 | `Content-Disposition: attachment`; `X-Content-Type-Options: nosniff`; each download audited. Unauthorized → 404 (NS-12) |
+
+**MVP subset (IMPLEMENTATION_LOG §11, Stage 3).** Built under project-scoped paths instead of the milestone and version paths above: `POST /projects/{id}/submissions` (owner only; 201; creates revision 1, or the next revision only after CHANGES_REQUESTED, else 409 `INVALID_TRANSITION`; archived project → 422 `PROJECT_ARCHIVED`), `GET /projects/{id}/submissions` (unpaginated, ordered by `revisionNo` ascending), `GET /submissions/{id}`, `POST /submissions/{id}/review/start` (faculty supervisor only; SUBMITTED → UNDER_REVIEW; 200), and `POST /submissions/{id}/review` (faculty supervisor only; body `{decision, feedback?}`; 201). The review rules are: an admin gets 403 `FORBIDDEN_ROLE`; a non-supervisor faculty member or an invisible project gets 404; a decision on a decided submission gets 409 `REVIEW_EXISTS`; a decision before the review starts gets 409 `INVALID_TRANSITION`; CHANGES_REQUESTED without non-blank feedback gets 422 `FEEDBACK_REQUIRED`. Deviations: there is no DRAFT, no version-create endpoint, no file upload or download, and no milestone scope. A submission is a single revision row with a `https://` link instead of files. Submission reviews are blocked on archived projects (422 `PROJECT_ARCHIVED`). Revision and review checks run after the archived check and before any write.
 
 Admin download: ADMIN has no path to student submission files in MVP (ADR-007). `GET /submission-files/{fileId}/download` returns 404 for administrators on submission files. Administrators can still see audit metadata about submissions.
 

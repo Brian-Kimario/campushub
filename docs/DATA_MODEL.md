@@ -195,6 +195,8 @@ Unique `(project_id, sequence)`. Index `ix_milestones_project_due (project_id, d
 
 Indexes: `ix_tasks_project_status_due (project_id, status, due_at)`, `ix_tasks_assignee_status_due (assignee_id, status, due_at)`, `ix_tasks_milestone (milestone_id)`.
 
+**MVP deviation (`V5__tasks.sql`, IMPLEMENTATION_LOG §11).** The applied table has no `milestone_id` or `assignee_id`, so the composite milestone FK, the assignee index, and the milestone index are absent. The due column is `due_date DATE`, not `due_at DATETIME(6)`. `completed_at DATETIME(6)` is added and set only when `status='DONE'`. The migration has a single index, `ix_tasks_project_status_due (project_id, status, due_date)`. The `blocked_reason` CHECK is kept.
+
 ### 6.3 `task_comments` (P1)
 
 `id`, `task_id` FK RESTRICT, `author_id` FK RESTRICT, `body` VARCHAR(2000) NOT NULL, `created_at`. Append-only: no UPDATE/DELETE endpoint. Index `ix_comments_task_created (task_id, created_at)`.
@@ -247,6 +249,8 @@ Limits: ≤ 5 rows per `version_id` enforced in service and by a `BEFORE INSERT`
 
 `id`, `version_id` UNIQUE FK RESTRICT, `reviewer_id` FK RESTRICT, `decision` VARCHAR(20) CHECK in (`ACCEPTED`,`CHANGES_REQUESTED`), `feedback` TEXT NULL, `created_at`.
 Invariant: `decision = 'ACCEPTED' OR feedback IS NOT NULL` (CHECK). `UNIQUE (version_id)` enforces one decision per version (FR-REV-02).
+
+**MVP deviation (IMPLEMENTATION_LOG §11, Stage 3).** Migration `V6__submissions.sql` builds one `submissions` table with one row per revision, scoped to `project_id`, and replaces §7.1 through §7.4 for the MVP. Columns: `revision_no`, `title`, `description`, `link` (CHECK `https://%`), `status` (SUBMITTED, UNDER_REVIEW, CHANGES_REQUESTED, ACCEPTED), `submitted_by`, `submitted_at`, `reviewed_by`, `reviewed_at`, `feedback`, and `version`. The decision is stored on the same row, so `submission_versions`, `submission_files`, and `reviews` are not built. Constraints: `UNIQUE (project_id, revision_no)`; a CHECK that a review exists only in the decided and under-review states; and a CHECK that CHANGES_REQUESTED has feedback. DRAFT is not a status: a revision is sealed at creation.
 
 ## 8. Skills and certifications (P1)
 

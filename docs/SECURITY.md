@@ -31,7 +31,7 @@ Actors: anonymous internet user; authenticated student, faculty, or administrato
 | Control | Design | Verified by |
 |---|---|---|
 | Password storage | BCrypt cost 12 (ADR-005). Argon2id is an accepted substitute if the library is available; the choice is a single configuration point | Hash format test; no plaintext in DB dumps (test fixture scan) |
-| Password policy | 12–128 characters; not equal to the previous password; rejects a bundled list of the 10,000 most common passwords | Unit tests with known weak values |
+| Password policy | 12 to 72 UTF-8 bytes (BCrypt input limit, IMPLEMENTATION_LOG §10); not equal to the previous password; rejects a short starter list of common passwords (not the full 10,000-entry list; IMPLEMENTATION_LOG §10) | Unit tests with known weak values |
 | Login | Identical 401 response for unknown email, wrong password, and locked account (lock is not observable) | Test that compares responses and timing bounds |
 | Lockout | 5 consecutive failures set `locked_until` to now + 15 min; a successful login resets the counter | Integration test |
 | Throttling | 20 login attempts per minute per client IP, returning 429 with `Retry-After` | Integration test |
