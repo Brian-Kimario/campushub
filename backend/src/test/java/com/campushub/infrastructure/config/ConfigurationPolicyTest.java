@@ -97,12 +97,12 @@ class ConfigurationPolicyTest {
     void shortDevSeedPasswordIsRefusedWithoutEchoingTheValue() {
         Map<String, String> settings = validSettings();
         settings.put("campushub.dev-seed-enabled", "true");
-        settings.put("campushub.dev-seed-password", "short-pw");
+        settings.put("campushub.dev-seed-password", "short");
 
         List<String> violations = ConfigurationPolicy.violations(settings::get, Set.of("dev"));
 
-        assertEquals(List.of("campushub.dev-seed-password must be at least 12 characters"), violations);
-        assertFalse(violations.get(0).contains("short-pw"));
+        assertEquals(List.of("campushub.dev-seed-password must be at least 8 characters"), violations);
+        assertFalse(violations.get(0).contains("short"));
     }
 
     @Test

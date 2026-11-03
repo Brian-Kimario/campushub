@@ -7,6 +7,18 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [MVP password minimum] — 2026-11-03 — Minimum lowered to 8 characters
+
+**Status:** Complete locally. Not pushed.
+
+**Affected documents:** `docs/SECURITY.md` and `docs/API_CONTRACT.md` (password policy), `docs/DEMO_SCRIPT.md` (change-password step), `docs/IMPLEMENTATION_LOG.md` (§11 entry).
+
+**Changed (code):** `PasswordPolicy.MIN_LENGTH` and the dev seed minimum (`ConfigurationPolicy`) lowered from 12 to 8. The maximum stays at 72 UTF-8 bytes (BCrypt input limit). The frontend change-password form uses the same minimum. The common-password list gained short entries (for example `password`, `12345678`) because an 8-character minimum would otherwise admit them.
+
+**Changed (local data only):** the four demo accounts were set to a shared local password through the change-password endpoint. The value is not recorded in any document or commit.
+
+**Verified:** `./mvnw -B verify` (90 tests, 0 failures, BUILD SUCCESS). `npm run build` passes. `npm run lint` exits 0. All four demo accounts log in through `/api/v1`.
+
 ## [MVP Stage 4 follow-up] — 2026-11-03 — `/api/v1` migration, lint, browser verification, demo script
 
 **Status:** Complete locally. Committed locally in four commits (`/api/v1` and identity, MVP backend slices, frontend, docs); not pushed. See `git log`.

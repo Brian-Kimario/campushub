@@ -15,7 +15,7 @@ import java.util.Set;
  */
 public final class PasswordPolicy {
 
-    public static final int MIN_LENGTH = 12;
+    public static final int MIN_LENGTH = 8;
 
     /**
      * BCrypt reads only the first 72 bytes of its input, so a longer password would silently
@@ -24,6 +24,14 @@ public final class PasswordPolicy {
     public static final int MAX_BYTES = 72;
 
     private static final Set<String> COMMON_PASSWORDS = Set.of(
+            "password",
+            "password1",
+            "12345678",
+            "qwerty12",
+            "iloveyou",
+            "welcome1",
+            "letmein1",
+            "changeme",
             "password1234",
             "password12345",
             "123456789012",

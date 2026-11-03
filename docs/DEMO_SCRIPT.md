@@ -130,7 +130,7 @@ If a check returns an unexpected result, say so. Do not change the expected valu
 
 The seeded accounts do not require a password change. Use this step with an account that has `mustChangePassword` set, or with the student account after the change is made.
 
-1. Open `/change-password` while signed in. Enter the current password and a new one of 12 to 72 bytes.
+1. Open `/change-password` while signed in. Enter the current password and a new one of 8 to 72 bytes.
    - Expected: the change succeeds.
 2. Sign out. Sign in with the old password, then with the new one.
    - Expected: the old password is refused with the generic message; the new one works.

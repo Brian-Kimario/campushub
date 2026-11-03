@@ -272,3 +272,9 @@ Earlier documents cite this section for the Phase 2 deviations and the password 
 - **Resolved deviation:** the root-route mapping recorded in the Stage 4 entry above is closed by the `/api/v1` migration.
 - **Open:** sign-out sometimes needs a second attempt in the browser pane (not investigated). Stage 6 E2E run not started.
 - **CI:** latest GitHub Actions run on `98e9b7b` succeeded (run 41591794252). The follow-up changes are not pushed, so they have no CI run yet.
+
+### 2026-11-03 — Password minimum lowered to 8 characters
+
+- **Changed:** `PasswordPolicy.MIN_LENGTH` and the dev seed minimum from 12 to 8; the 72-byte maximum is unchanged. The common-password list gained short entries so the lower minimum does not admit `password` or `12345678`.
+- **Verified:** `./mvnw -B verify` (90 tests, 0 failures). Demo accounts changed through `/auth/change-password` and confirmed by login.
+- **Not verified:** the full common-password list (still the starter list noted in §10).

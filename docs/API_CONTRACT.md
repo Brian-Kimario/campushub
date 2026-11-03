@@ -52,7 +52,7 @@ For private resources the response to a caller without access is 404 `NOT_FOUND`
 
 `user` summary: `{id, email, institutionalId, displayName, role, status, mustChangePassword, departmentId}`. Never includes `password_hash` or lockout fields.
 
-Password policy: at least 12 characters and at most 72 UTF-8 bytes (the BCrypt input limit, ADR-005; IMPLEMENTATION_LOG §10); must differ from the last password; rejects values on a bundled list of common passwords (SECURITY §3).
+Password policy: at least 8 characters and at most 72 UTF-8 bytes (the BCrypt input limit, ADR-005; IMPLEMENTATION_LOG §10); must differ from the last password; rejects values on a bundled list of common passwords (SECURITY §3).
 
 Gate: while `mustChangePassword` is true, every endpoint except `/auth/me`, `/auth/logout`, and `/auth/change-password` returns 403 `PASSWORD_CHANGE_REQUIRED`.
 

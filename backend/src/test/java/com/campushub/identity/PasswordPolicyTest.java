@@ -28,7 +28,13 @@ class PasswordPolicyTest {
 
     @Test
     void rejectsShortAndCommonPasswords() {
-        assertEquals(List.of("must be at least 12 characters"), PasswordPolicy.violations("short"));
+        assertEquals(List.of("must be at least 8 characters"), PasswordPolicy.violations("Test@12"));
         assertEquals(List.of("is too common"), PasswordPolicy.violations("Password1234"));
+        assertEquals(List.of("is too common"), PasswordPolicy.violations("PASSWORD"));
+    }
+
+    @Test
+    void acceptsAnEightCharacterPassword() {
+        assertTrue(PasswordPolicy.violations("Test@1234").isEmpty());
     }
 }

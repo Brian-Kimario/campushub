@@ -10,8 +10,8 @@ import { CharCount, ErrorBanner } from '../../components/ui'
 import { sessionCleared } from './authSlice'
 import { useChangePasswordMutation } from './authApi'
 
-// Policy: 12 to 72 UTF-8 bytes (SECURITY.md; BCrypt input limit). The server re-checks every rule.
-const PASSWORD_MIN_CHARS = 12
+// Policy: 8 to 72 UTF-8 bytes (SECURITY.md; BCrypt input limit). The server re-checks every rule.
+const PASSWORD_MIN_CHARS = 8
 const PASSWORD_MAX_BYTES = 72
 const encoder = new TextEncoder()
 
