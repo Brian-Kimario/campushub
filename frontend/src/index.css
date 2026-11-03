@@ -190,6 +190,7 @@ select[aria-invalid='true'] {
 
 .app-header nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
 }
 
