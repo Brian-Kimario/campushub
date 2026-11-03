@@ -7,6 +7,20 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [Phase 8 checkpoint] — 2026-11-04 — Browser check of admin and faculty flows
+
+**Status:** Partial. Checked in the built-in browser against the local stack with Kafka disabled.
+
+**Verified:**
+- Admin: signed in; the skill catalog accepts a new skill (POST `/admin/skills` returned 201 and the list refreshed). The project page shows the Administration section (supervisor assignment, archive).
+- Faculty: signed in; the supervised project shows the faculty review action on a submitted revision. The skills page shows the catalog without the admin add form. The project page has no Administration section.
+- Faculty dashboard: "Supervised projects 2 / Awaiting review 2 / Reviewed 2 / Needing attention 2", with one awaiting review per project. Consistent with the seeded submissions. Not checked against the API response.
+
+**Not verified:**
+- The admin dashboard has no statistics: the page says the dashboard is for students and faculty. This is a known gap.
+- Submitting a review decision, supervisor reassignment and archiving were not exercised, to avoid changing shared data.
+- A test skill, "Checkpoint Skill", was created in the local database during this check.
+
 ## [Phase 8] — 2026-11-04 — Optional Kafka and transactional outbox
 
 **Status:** Implemented locally. Disabled by default (ADR-011). Not pushed in this entry.
