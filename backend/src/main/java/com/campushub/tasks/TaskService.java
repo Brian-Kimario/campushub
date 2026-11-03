@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Task use cases. Visibility follows the project: a caller who cannot see the project gets 404 for
- * its tasks too. Only the project owner writes; a visible non-owner gets 403 FORBIDDEN_STATE
+ * its tasks too. The owner and team members write; other visible callers get 403 FORBIDDEN_STATE
  * (AUTHORIZATION_MATRIX §1). Order after that: archived, then version, then transition legality.
  */
 @Service
@@ -62,7 +62,7 @@ public class TaskService {
     public TaskResponse create(AuthenticatedUser caller, UUID projectId, CreateTaskRequest body,
                                HttpServletRequest request) {
         Project project = projects.visibleProject(caller, projectId);
-        requireOwner(caller, project);
+        requireTeamWriter(caller, project);
         ProjectService.requireNotArchived(project);
         TaskPriority priority = body.priority() == null ? TaskPriority.MEDIUM : body.priority();
         Task task = new Task(UUID.randomUUID(), projectId, caller.userId(), body.title(), body.description(),
@@ -77,7 +77,7 @@ public class TaskService {
     public TaskResponse update(AuthenticatedUser caller, UUID id, UpdateTaskRequest body, HttpServletRequest request) {
         Task task = findTask(id);
         Project project = projectFor(caller, task);
-        requireOwner(caller, project);
+        requireTeamWriter(caller, project);
         ProjectService.requireNotArchived(project);
         if (body.status() != null) {
             throw new ApiException(ErrorCode.FIELD_NOT_EDITABLE,
@@ -96,7 +96,7 @@ public class TaskService {
                                    HttpServletRequest request) {
         Task task = findTask(id);
         Project project = projectFor(caller, task);
-        requireOwner(caller, project);
+        requireTeamWriter(caller, project);
         ProjectService.requireNotArchived(project);
         requireVersion(task, body.version());
 
@@ -123,9 +123,9 @@ public class TaskService {
         return projects.findVisible(caller, task.getProjectId()).orElseThrow(TaskService::notFound);
     }
 
-    private static void requireOwner(AuthenticatedUser caller, Project project) {
-        if (!project.isOwnedBy(caller.userId())) {
-            throw new ApiException(ErrorCode.FORBIDDEN_STATE, "Only the project owner can change its tasks.");
+    private void requireTeamWriter(AuthenticatedUser caller, Project project) {
+        if (!projects.canWriteTeamWork(caller, project)) {
+            throw new ApiException(ErrorCode.FORBIDDEN_STATE, "Only the project owner or a team member can change its tasks.");
         }
     }
 

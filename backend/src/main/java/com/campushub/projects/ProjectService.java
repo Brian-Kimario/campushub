@@ -45,24 +45,30 @@ public class ProjectService {
     private static final String PROJECT_ARCHIVED = "project.archived";
 
     private final ProjectRepository projects;
+    private final ProjectMemberRepository members;
     private final UserAccountRepository users;
     private final AuditService audit;
     private final Clock clock;
 
-    public ProjectService(ProjectRepository projects, UserAccountRepository users, AuditService audit, Clock clock) {
+    public ProjectService(ProjectRepository projects, ProjectMemberRepository members, UserAccountRepository users,
+                          AuditService audit, Clock clock) {
         this.projects = projects;
+        this.members = members;
         this.users = users;
         this.audit = audit;
         this.clock = clock;
     }
 
-    /** Students see the projects they own, faculty the projects they supervise, and admins all of them. */
+    /**
+     * Students see the projects they own or belong to as a team member, faculty the projects they
+     * supervise, and admins all of them.
+     */
     @Transactional(readOnly = true)
     public PageResponse<ProjectResponse> list(AuthenticatedUser caller, ProjectStatus status, int page, int size) {
-        UUID ownerId = caller.role() == Role.STUDENT ? caller.userId() : null;
+        UUID studentId = caller.role() == Role.STUDENT ? caller.userId() : null;
         UUID supervisorId = caller.role() == Role.FACULTY ? caller.userId() : null;
         Pageable pageable = Pagination.request(page, size, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
-        Page<Project> found = projects.search(ownerId, supervisorId, status, pageable);
+        Page<Project> found = projects.search(studentId, supervisorId, status, pageable);
         Map<UUID, UserAccount> people = peopleFor(found.getContent());
         return PageResponse.of(found.map(project -> toResponse(project, people)), SORT);
     }
@@ -143,12 +149,23 @@ public class ProjectService {
         return projects.findById(id).filter(project -> canSee(caller, project));
     }
 
-    private static boolean canSee(AuthenticatedUser caller, Project project) {
+    /** Owner or team member: may create and change tasks and submissions. Supervisors and admins may not. */
+    public boolean canWriteTeamWork(AuthenticatedUser caller, Project project) {
+        return project.isOwnedBy(caller.userId()) || isMember(caller, project);
+    }
+
+    /** Whether the caller may see the project. Calendar and list views filter with this too. */
+    public boolean canSee(AuthenticatedUser caller, Project project) {
         return switch (caller.role()) {
             case ADMIN -> true;
-            case STUDENT -> project.isOwnedBy(caller.userId());
+            case STUDENT -> project.isOwnedBy(caller.userId()) || isMember(caller, project);
             case FACULTY -> project.isSupervisedBy(caller.userId());
         };
+    }
+
+    private boolean isMember(AuthenticatedUser caller, Project project) {
+        return caller.role() == Role.STUDENT
+                && members.existsByProjectIdAndUserId(project.getId(), caller.userId());
     }
 
     private static void requireRole(AuthenticatedUser caller, Role role) {

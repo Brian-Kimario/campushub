@@ -59,7 +59,7 @@ public class SubmissionService {
     public SubmissionResponse create(AuthenticatedUser caller, UUID projectId, CreateSubmissionRequest body,
                                      HttpServletRequest request) {
         Project project = projects.visibleProject(caller, projectId);
-        requireOwner(caller, project);
+        requireTeamWriter(caller, project);
         ProjectService.requireNotArchived(project);
         int revisionNo = nextRevisionNo(submissions.findFirstByProjectIdOrderByRevisionNoDesc(projectId));
         Submission submission = new Submission(UUID.randomUUID(), projectId, revisionNo, body.title(),
@@ -132,9 +132,9 @@ public class SubmissionService {
         }
     }
 
-    private static void requireOwner(AuthenticatedUser caller, Project project) {
-        if (!project.isOwnedBy(caller.userId())) {
-            throw new ApiException(ErrorCode.FORBIDDEN_STATE, "Only the project owner can submit work.");
+    private void requireTeamWriter(AuthenticatedUser caller, Project project) {
+        if (!projects.canWriteTeamWork(caller, project)) {
+            throw new ApiException(ErrorCode.FORBIDDEN_STATE, "Only the project owner or a team member can submit work.");
         }
     }
 
