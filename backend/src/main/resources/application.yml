@@ -1,0 +1,70 @@
+# CampusHub base configuration. Every value comes from the environment (DEPLOYMENT §3).
+# Empty defaults are deliberate: ConfigurationPolicy refuses to start when a required value is missing.
+
+spring:
+  application:
+    name: campushub
+  datasource:
+    url: jdbc:mysql://${CAMPUSHUB_DB_HOST:localhost}:${CAMPUSHUB_DB_PORT:3306}/${CAMPUSHUB_DB_NAME:campushub}?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC&sslMode=PREFERRED
+    username: ${CAMPUSHUB_DB_APP_USER:}
+    password: ${CAMPUSHUB_DB_APP_PASSWORD:}
+  flyway:
+    # Migrations run with the migration user only (ADR-002, DEPLOYMENT §5.1).
+    user: ${CAMPUSHUB_DB_MIGRATION_USER:}
+    password: ${CAMPUSHUB_DB_MIGRATION_PASSWORD:}
+    locations: classpath:db/migration
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+server:
+  port: 8080
+  error:
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db,storage
+
+# Off by default. Only the dev profile enables it, so a missing profile cannot expose the API description.
+springdoc:
+  api-docs:
+    enabled: false
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: false
+
+campushub:
+  jwt:
+    secret: ${CAMPUSHUB_JWT_SECRET:}
+    issuer: ${CAMPUSHUB_JWT_ISSUER:campushub}
+    audience: ${CAMPUSHUB_JWT_AUDIENCE:campushub-api}
+    access-ttl-minutes: ${CAMPUSHUB_JWT_ACCESS_TTL_MINUTES:15}
+  cors:
+    allowed-origins: ${CAMPUSHUB_CORS_ALLOWED_ORIGINS:}
+  storage:
+    root: ${CAMPUSHUB_STORAGE_ROOT:/var/campushub/storage}
+  upload:
+    max-file-bytes: ${CAMPUSHUB_UPLOAD_MAX_FILE_BYTES:20971520}
+    max-files-per-version: ${CAMPUSHUB_UPLOAD_MAX_FILES_PER_VERSION:5}
+  institution-timezone: ${CAMPUSHUB_INSTITUTION_TIMEZONE:UTC}
+  kafka:
+    enabled: ${CAMPUSHUB_KAFKA_ENABLED:false}
+  dev-seed-enabled: ${CAMPUSHUB_DEV_SEED_ENABLED:false}

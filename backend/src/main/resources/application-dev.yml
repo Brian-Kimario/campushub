@@ -1,0 +1,6 @@
+# Local development profile. Enables the API description and the interactive documentation.
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true

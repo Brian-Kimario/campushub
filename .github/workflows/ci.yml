@@ -1,0 +1,51 @@
+# Pull request and main-branch pipeline (CI_CD §2.1, Phase 1 subset).
+# Phase 1 covers the backend build, tests, and API image build. The secret scan, frontend, E2E,
+# CodeQL, publish, and deploy jobs arrive in the phases that create their code (CI_CD §2).
+# No secrets are used: Testcontainers starts its own MySQL with throwaway credentials.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend (mvnw verify)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Verify (compile, unit tests, Testcontainers MySQL tests)
+        run: ./mvnw -B verify
+
+  image:
+    name: api image (build only, no push)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    needs: backend
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Build API image
+        run: docker build --tag campushub-api:ci backend

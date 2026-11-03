@@ -1,0 +1,42 @@
+# CampusHub local stack (DEPLOYMENT §2). Requires a local .env file; copy .env.example and generate real secrets.
+# Images are pinned by digest (ADR-022, CI_CD). Update the digest deliberately, never by tag alone.
+
+services:
+  mysql:
+    image: mysql:8.4@sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902
+    environment:
+      MYSQL_DATABASE: ${CAMPUSHUB_DB_NAME:-campushub}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+      CAMPUSHUB_DB_APP_USER: ${CAMPUSHUB_DB_APP_USER:?Set CAMPUSHUB_DB_APP_USER in .env}
+      CAMPUSHUB_DB_APP_PASSWORD: ${CAMPUSHUB_DB_APP_PASSWORD:?Set CAMPUSHUB_DB_APP_PASSWORD in .env}
+      CAMPUSHUB_DB_MIGRATION_USER: ${CAMPUSHUB_DB_MIGRATION_USER:?Set CAMPUSHUB_DB_MIGRATION_USER in .env}
+      CAMPUSHUB_DB_MIGRATION_PASSWORD: ${CAMPUSHUB_DB_MIGRATION_PASSWORD:?Set CAMPUSHUB_DB_MIGRATION_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - ./infra/docker/data/mysql:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  api:
+    build: ./backend
+    env_file: .env
+    environment:
+      # Compose network host name; overrides the localhost default in .env.
+      CAMPUSHUB_DB_HOST: mysql
+      SPRING_PROFILES_ACTIVE: dev
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - storage:/var/campushub/storage
+
+volumes:
+  storage:

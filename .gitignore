@@ -1,0 +1,40 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Secrets and local environment (never commit real values)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+secrets/
+
+# Java / Spring Boot
+backend/target/
+backend/.mvn/wrapper/*.jar
+*.class
+*.log
+backend/uploads/
+backend/storage/
+
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+
+# Docker / local data
+infra/docker/data/
+*.dump
+*.sql.gz
+
+# Test and coverage output
+coverage/
+**/jacoco/

@@ -1,0 +1,6 @@
+# Production profile. Public API documentation is off; the dev seed is refused by ConfigurationPolicy.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
