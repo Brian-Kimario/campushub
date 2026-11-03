@@ -7,6 +7,27 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [Phase 7a certifications] — 2026-11-03 — Owner-private certification records
+
+**Status:** Complete locally. Not committed or pushed. Evidence files are not included.
+
+**Affected documents:** `docs/DEMO_SCRIPT.md` (§3.9 certifications walkthrough), `docs/DATA_MODEL.md` (migration table: V8 and V9 rows), `docs/CHANGELOG.md` (this entry). `docs/API_CONTRACT.md` §11 and `docs/AUTHORIZATION_MATRIX.md` §3.9 already described this scope and were left unchanged, except for the evidence rows noted below.
+
+**Changed (code):**
+- Flyway V9 creates `certifications` (owner, title, issuer, issued date, optional credential URL, created time). The URL must start with `https://` (database CHECK). Index `ix_certs_owner`.
+- `GET /users/me/certifications` (paginated, newest issue date first), `POST /users/me/certifications` (201), `DELETE /users/me/certifications/{id}` (204, audited). STUDENT only; other roles get 403 `FORBIDDEN_ROLE`. A row owned by another student reads as 404 `NOT_FOUND`.
+- The server stores the credential URL as text and never fetches it (SECURITY.md, SSRF).
+- Frontend `/certifications` page for students: add form with client-side checks, a paginated list, and a confirmation before delete. A "Certifications" nav link shows for students only.
+
+**Deferred:** `certification_files` and the evidence upload and download endpoints (`/users/me/certifications/{id}/file`). The MVP has no file storage path yet, so they wait for the storage layer.
+
+**Verified:**
+- `./mvnw -B verify`: 116 tests, 0 failures (BUILD SUCCESS). This includes 8 tests in `CertificationFlowIntegrationTest`.
+- `npm run build`, `npx tsc -b`, and `npx oxlint` (exit 0).
+- Built-in browser: student adds a certification with a `http://` link (refused by the page), then with an `https://` link (saved and listed), then deletes it through the confirmation dialog (list returns to empty).
+
+**Not verified:** the faculty and administrator refusals in the browser (backend test covers them); the audit rows written for create and delete (not asserted by a test yet).
+
 ## [Phase 5B student skills] — 2026-11-03 — Skill catalog and student proficiency
 
 **Status:** Complete locally. Not pushed.

@@ -105,3 +105,12 @@ export interface OwnSkill {
   evidenceNote: string | null
   updatedAt: string
 }
+
+export interface Certification {
+  id: string
+  title: string
+  issuer: string
+  issuedOn: string
+  credentialUrl: string | null
+  createdAt: string
+}

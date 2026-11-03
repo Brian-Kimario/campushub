@@ -4,6 +4,7 @@ import { AppShell } from '../components/AppShell'
 import { PageLoading } from '../components/ui'
 import { RequireAuth } from '../features/auth/RequireAuth'
 import {
+  CertificationsPage,
   ChangePasswordPage,
   LoginPage,
   ProjectDetailPage,
@@ -33,6 +34,7 @@ export const router = createBrowserRouter([
       { path: 'projects/:projectId', element: lazyPage(<ProjectDetailPage />) },
       { path: 'projects/:projectId/edit', element: lazyPage(<ProjectFormPage />) },
       { path: 'skills', element: lazyPage(<SkillsPage />) },
+      { path: 'certifications', element: lazyPage(<CertificationsPage />) },
       { path: '*', element: <Navigate to="/projects" replace /> },
     ],
   },

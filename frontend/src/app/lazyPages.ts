@@ -8,3 +8,4 @@ export const ProjectListPage = lazy(() => import('../features/projects/ProjectLi
 export const ProjectDetailPage = lazy(() => import('../features/projects/ProjectDetailPage'))
 export const ProjectFormPage = lazy(() => import('../features/projects/ProjectFormPage'))
 export const SkillsPage = lazy(() => import('../features/skills/SkillsPage'))
+export const CertificationsPage = lazy(() => import('../features/certifications/CertificationsPage'))

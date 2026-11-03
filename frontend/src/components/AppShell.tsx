@@ -31,6 +31,7 @@ export function AppShell() {
         <nav aria-label="Main">
           <NavLink to="/projects">Projects</NavLink>
           <NavLink to="/skills">Skills</NavLink>
+          {user?.role === 'STUDENT' && <NavLink to="/certifications">Certifications</NavLink>}
           <NavLink to="/change-password">Change password</NavLink>
         </nav>
         <div className="session">

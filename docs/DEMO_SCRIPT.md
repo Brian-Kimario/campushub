@@ -145,6 +145,19 @@ The seeded accounts do not require a password change. Use this step with an acco
 3. Check the administrator and faculty views of `/skills`.
    - Expected: no "My skills" editor. The catalog is visible to both, and the add form appears only for the administrator.
 
+### 3.9 Certifications (Phase 7a)
+
+1. Sign in as the student and open `/certifications`. Add a certification: a title, an issuer, an issue date, and a credential link starting with `https://`.
+   - Expected: it appears in "My certifications" with the issue date and a "View credential" link.
+2. Enter a credential link that starts with `http://` and submit.
+   - Expected: the form refuses it and names the `https://` rule. Nothing is saved.
+3. Delete the certification and confirm.
+   - Expected: the list is empty again.
+4. Sign in as the administrator or faculty.
+   - Expected: no "Certifications" navigation. The page shows that only students keep certifications.
+
+Evidence file upload is not part of this phase.
+
 ## 4. Verification status
 
 What was checked, and how. Anything not listed as verified was not demonstrated end to end in the browser.

@@ -288,7 +288,8 @@ Every list endpoint has a bounded page size and a sort allowlist. Phase 9 verifi
 | `V5__milestones_tasks.sql` | `milestones`, `tasks`, `task_comments`, `project_activity` | 5 |
 | `V6__submissions_reviews.sql` | `submissions`, `submission_versions`, `submission_files`, `reviews`, triggers | 6 |
 | `V7__refresh_sessions.sql` | `refresh_sessions` for ADR-025 refresh cookies | 7 |
-| (planned) `V8`, `V9` | Skills and certifications tables, Phase 5B and 5C | — |
+| `V8__skills.sql` | `skills`, `user_skills` (Phase 5B) | 5B |
+| `V9__certifications.sql` | `certifications`; `certification_files` waits for the storage layer | 7a |
 | `V8__outbox.sql` | P2 tables | 8 |
 
 Rules: migrations are never edited after merge; corrections are new migrations. Each migration has a rollback note in its header comment and a test that applies all migrations to an empty database (NFR-DATA-01).
