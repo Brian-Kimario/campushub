@@ -59,6 +59,8 @@ class MySqlIntegrationTest {
         registry.add("campushub.jwt.secret", () -> "integration-test-secret-of-more-than-32-bytes");
         registry.add("campushub.cors.allowed-origins", () -> "http://localhost:5173");
         registry.add("campushub.storage.root", storageRoot::toString);
+        registry.add("campushub.dev-seed-enabled", () -> "true");
+        registry.add("campushub.dev-seed-password", () -> "dev-seed-password-123");
     }
 
     @Autowired
@@ -78,14 +80,18 @@ class MySqlIntegrationTest {
                 .andExpect(jsonPath("$.status").value("UP"));
     }
 
+    /**
+     * Deviation (IMPLEMENTATION_LOG §10): the authentication rule is the last matcher, so an
+     * anonymous request to an unknown path gets 401, not 404. Authenticated unknown paths get 404.
+     */
     @Test
-    void unknownPathReturnsProblemDetailsWithErrorCode() throws Exception {
+    void anonymousUnknownPathIsUnauthenticatedProblem() throws Exception {
         mockMvc.perform(get("/no-such-resource"))
-                .andExpect(status().isNotFound())
+                .andExpect(status().isUnauthorized())
                 .andExpect(header().string("Content-Type", startsWith("application/problem+json")))
-                .andExpect(jsonPath("$.type").value("urn:campushub:problem:not-found"))
-                .andExpect(jsonPath("$.status").value(404))
-                .andExpect(jsonPath("$.errorCode").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.type").value("urn:campushub:problem:unauthenticated"))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.errorCode").value("UNAUTHENTICATED"))
                 .andExpect(jsonPath("$.requestId").isNotEmpty())
                 .andExpect(jsonPath("$.instance").value("/no-such-resource"));
     }

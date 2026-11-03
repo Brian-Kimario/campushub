@@ -1,7 +1,6 @@
 package com.campushub.shared.errors;
 
 import jakarta.servlet.http.HttpServletRequest;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -12,7 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -29,7 +27,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
  * Maps every error to RFC 9457 Problem Details with a documented {@code errorCode}
  * (ADR-012). Framework errors without a CampusHub code (for example 405) keep the
  * framework's status and carry no {@code errorCode}; that gap is recorded in
- * IMPLEMENTATION_LOG for Phase 2.
+ * IMPLEMENTATION_LOG §10.
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
@@ -38,7 +36,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     ResponseEntity<Object> handleApiException(ApiException ex, WebRequest request) {
-        return problem(ex.errorCode(), ex.getMessage(), request, null);
+        return problem(ex.errorCode(), ex.getMessage(), request, ex.errors(), UUID.randomUUID().toString(), ex.retryAfterSeconds());
     }
 
     @Override
@@ -82,21 +80,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private ResponseEntity<Object> problem(
             ErrorCode code, String detail, WebRequest request, List<Map<String, String>> errors) {
-        return problem(code, detail, request, errors, UUID.randomUUID().toString());
+        return problem(code, detail, request, errors, UUID.randomUUID().toString(), null);
     }
 
     private ResponseEntity<Object> problem(
             ErrorCode code, String detail, WebRequest request, List<Map<String, String>> errors, String requestId) {
-        ProblemDetail body = ProblemDetail.forStatusAndDetail(code.status(), detail);
-        body.setType(URI.create(code.problemType()));
-        body.setTitle(code.title());
-        body.setInstance(URI.create(pathOf(request)));
-        body.setProperty("errorCode", code.name());
-        body.setProperty("requestId", requestId);
-        if (errors != null) {
-            body.setProperty("errors", errors);
+        return problem(code, detail, request, errors, requestId, null);
+    }
+
+    private ResponseEntity<Object> problem(
+            ErrorCode code, String detail, WebRequest request, List<Map<String, String>> errors,
+            String requestId, Long retryAfterSeconds) {
+        ProblemDetail body = ProblemFactory.create(code, detail, pathOf(request), requestId, errors);
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(code.status());
+        if (retryAfterSeconds != null) {
+            response.header(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfterSeconds));
         }
-        return ResponseEntity.status(code.status()).body(body);
+        return response.body(body);
     }
 
     private static String pathOf(WebRequest request) {

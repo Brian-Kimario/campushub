@@ -15,6 +15,7 @@ import java.util.function.Function;
 public final class ConfigurationPolicy {
 
     static final int MIN_JWT_SECRET_BYTES = 32;
+    static final int MIN_DEV_SEED_PASSWORD_LENGTH = 12;
 
     private static final List<String> PLACEHOLDER_PREFIXES = List.of("replace-with-", "change-me");
 
@@ -66,6 +67,9 @@ public final class ConfigurationPolicy {
         if (devSeed && activeProfiles.contains("prod")) {
             violations.add("campushub.dev-seed-enabled must be false in the prod profile");
         }
+        if (devSeed) {
+            checkDevSeedPassword(settings.apply("campushub.dev-seed-password"), violations);
+        }
 
         return violations;
     }
@@ -75,6 +79,16 @@ public final class ConfigurationPolicy {
             violations.add(key + " is missing");
         } else if (PLACEHOLDER_PREFIXES.stream().anyMatch(value::startsWith)) {
             violations.add(key + " holds a placeholder value");
+        }
+    }
+
+    private static void checkDevSeedPassword(String value, List<String> violations) {
+        if (value == null || value.isBlank()) {
+            violations.add("campushub.dev-seed-password is missing");
+        } else if (PLACEHOLDER_PREFIXES.stream().anyMatch(value::startsWith)) {
+            violations.add("campushub.dev-seed-password holds a placeholder value");
+        } else if (value.length() < MIN_DEV_SEED_PASSWORD_LENGTH) {
+            violations.add("campushub.dev-seed-password must be at least " + MIN_DEV_SEED_PASSWORD_LENGTH + " characters");
         }
     }
 

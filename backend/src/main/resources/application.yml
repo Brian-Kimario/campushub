@@ -68,3 +68,4 @@ campushub:
   kafka:
     enabled: ${CAMPUSHUB_KAFKA_ENABLED:false}
   dev-seed-enabled: ${CAMPUSHUB_DEV_SEED_ENABLED:false}
+  dev-seed-password: ${CAMPUSHUB_DEV_SEED_PASSWORD:}

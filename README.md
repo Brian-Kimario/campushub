@@ -2,7 +2,7 @@
 
 CampusHub is a role-aware academic collaboration platform for student projects. It connects project teams, tasks, milestones, skills, certifications, submissions, and faculty feedback in one system, with server-enforced authorization for every private resource.
 
-> **Status: Phase 1 — local infrastructure and backend skeleton (complete locally; committed locally, not pushed).** No application features are implemented. The CI workflow is validated locally but has not run on GitHub (no remote yet). The gate to Phase 2 requires owner approval (see [docs/PHASE_PLAN.md](docs/PHASE_PLAN.md)).
+> **Status: Phase 2 — identity, roles, and security (implemented locally; backend tests pass, not yet reviewed or pushed).** Sign-in, sign-out, password change, lockout, rate limit, HS256 bearer tokens, role checks, and the audit log are in place. No student-facing features yet. The gate to Phase 3 requires owner approval (see [docs/PHASE_PLAN.md](docs/PHASE_PLAN.md)).
 
 ## Planned stack
 

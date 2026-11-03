@@ -148,3 +148,43 @@ Owner acceptances of risks in RISKS (status *Accepted*) and answers to OD-1 to O
 - Decisions, risks, or owner items affected:
   - RISKS R-22 (CI has never run on GitHub) and R-23 (no secret scanning in CI) were added.
   - The CI and readiness-DOWN items in the earlier "not verified" list are closed by this entry. The CI item is closed only for local validation.
+
+### 2026-11-03 — Phase 2: identity, roles, and security
+- Phase: 2
+- Commit: a local commit is made at the end of this change. It is not pushed. The hash is reported in the handoff, not recorded here.
+- What changed:
+  - Migrations `V2__identity_catalog.sql` (`users`, without the `departments` foreign key) and `V3__auth_audit.sql` (`revoked_tokens`, `audit_events` (append-only by intent), `users.revoked_after`).
+  - `identity/`: `UserAccount`, `Role`, `UserStatus`, `PasswordPolicy`, `AuthService`, `AuthController`, `LoginRateLimiter`, `IdentityMaintenanceJobs` (UTC cron: purge revoked tokens at minute 05, clear expired locks at minute 25), `DevAccountSeeder` (only when `campushub.dev-seed-enabled=true`).
+  - `identity/security/`: `JwtTokenService` (Nimbus, HS256 only, 15-minute TTL, issuer and audience checked), `AuthenticationFilter` (revocation, account status, `revoked_after` at one-second precision, role-claim match, forced-change gate), `SecurityConfig` (stateless; BCrypt cost 12), `ProblemResponder`.
+  - `identity/audit/`: `AuditService` with a metadata allowlist and a keyed (HMAC-SHA256) IP hash.
+  - Errors: `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `FORBIDDEN_ROLE`, `FORBIDDEN_STATE`, `PASSWORD_CHANGE_REQUIRED`, `RATE_LIMITED` added to `ErrorCode`. `ProblemFactory` shares the RFC 9457 body between the MVC handler and the filter chain.
+  - `ConfigurationPolicy` refuses a dev seed without a password of at least 12 characters, and the message never echoes the value.
+  - Dependency: `nimbus-jose-jwt` 10.4.2, pinned in `pom.xml` because the Boot 3.5 parent does not manage it.
+- What was verified and how:
+  - `./mvnw -B verify` with the JDK 21 `JAVA_HOME`: 43 tests, 0 failures, BUILD SUCCESS.
+  - `TokenValidationTest` (10, no database): round trip; malformed tokens; `alg: none`; HS512; wrong signature; wrong issuer; wrong audience; expired; missing `jti`; unknown role.
+  - `AuthFlowIntegrationTest` (15, MySQL 8.4 container): login with summary and no credentials; identical 401 for wrong password and unknown email; `/auth/me`; no token gives 401 with `WWW-Authenticate: Bearer`; expired token gives 401; logout revokes; change password revokes older tokens and accepts the new password; weak replacement gives 400; forced change gives 403 `PASSWORD_CHANGE_REQUIRED` except on exempt paths; student on `/admin/**` gives 403 `FORBIDDEN_ROLE`; admin gets 200; another user's record gives 404; fifth failure locks, and the correct password then gives 401; 21st attempt from one address gives 429 with `Retry-After`; the dev seed creates four accounts without a forced change.
+  - `ConfigurationPolicyTest` (10): adds the dev-seed password rules.
+  - `MySqlIntegrationTest` (4): unknown anonymous path now gives 401 (see deviations).
+- What was not verified:
+  - The Compose stack with the Phase 2 image. Not run in this change.
+  - Lockout does not extend during a lock. The code path exists (`AuthService` returns before `recordFailedLogin` while locked), but no test asserts the stored `locked_until` is unchanged.
+  - Logs contain no password, token, or email. There is no log-capture test yet.
+  - The dev seed is idempotent across restarts. The test checks the accounts exist with no forced change, not that a re-run creates no duplicates.
+  - The scheduled jobs (`IdentityMaintenanceJobs`) have no test, and no run has observed them firing on their cron.
+  - BCrypt input is limited to 72 bytes. The password policy allows 128 characters. Behaviour above 72 bytes was not checked (see deviations).
+  - CI on GitHub (still no remote run; R-22).
+- Deviations (each one is a decision, not a silent gap):
+  - Unknown path, anonymous: 401 `UNAUTHENTICATED`, not 404. The authentication rule is the last matcher, so an anonymous caller learns nothing about route existence. Authenticated unknown paths still give 404.
+  - `/actuator/env` anonymous: 401, not 404. Same reason.
+  - `departments` foreign key on `users.department_id` deferred until the department catalog exists.
+  - Audit INSERT-only is not enforced at the database grant level yet. The application code has no update or delete path.
+  - Request IDs are random per error and per audit row. They are not yet correlated across the two.
+  - Rate limit is per node, in memory (R-09).
+  - Scheduled jobs run without a database lock, so they assume a single instance (R-02).
+  - Common-password list is a short starter list (documented gap in `PasswordPolicy`).
+  - Admin account creation and password reset endpoints are deferred. Refresh tokens are deferred (ADR-004).
+  - A token issued in the same second as a password change is refused (fail-closed, ADR-019), so the user signs in again after changing the password.
+- Decisions, risks, or owner items affected:
+  - ADR-003 (HS256, 15-minute TTL, strict validation), ADR-005 (BCrypt 12), ADR-006 (resource policy), ADR-019 (revocation and `revoked_after`), ADR-020 (lockout 5 failures, 15 minutes, 20 per minute per address), ADR-021 (roles), ADR-023 (audit) are implemented as written above.
+  - Not yet updated in this change: PHASE_PLAN status, RISKS evidence (R-02, R-03, R-05), CHANGELOG (no file exists yet), API_CONTRACT §3 (new codes need adding there, per ADR-012), and DATA_MODEL deviation notes. These are open items for the Phase 2 review.

@@ -4,14 +4,20 @@ import java.util.Locale;
 import org.springframework.http.HttpStatus;
 
 /**
- * Error codes from API_CONTRACT §3. Phase 1 defines only the codes its own
- * endpoints and framework handlers can produce. A new code is added here and
+ * Error codes from API_CONTRACT §3. Each code is added here in the same change that
+ * first produces it. A new code is added here and
  * to API_CONTRACT §3 in the same change (ADR-012).
  */
 public enum ErrorCode {
 
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "Request validation failed"),
+    UNAUTHENTICATED(HttpStatus.UNAUTHORIZED, "Authentication required"),
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "Invalid credentials"),
+    FORBIDDEN_ROLE(HttpStatus.FORBIDDEN, "Role does not permit this action"),
+    FORBIDDEN_STATE(HttpStatus.FORBIDDEN, "Action not permitted in the current state"),
+    PASSWORD_CHANGE_REQUIRED(HttpStatus.FORBIDDEN, "Password change required"),
     NOT_FOUND(HttpStatus.NOT_FOUND, "Resource not found"),
+    RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Too many requests"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error"),
     DEPENDENCY_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Dependency unavailable");
 

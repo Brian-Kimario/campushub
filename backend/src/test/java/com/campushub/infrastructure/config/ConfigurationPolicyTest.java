@@ -76,10 +76,33 @@ class ConfigurationPolicyTest {
     void devSeedInProdProfileIsRefused() {
         Map<String, String> settings = validSettings();
         settings.put("campushub.dev-seed-enabled", "true");
+        settings.put("campushub.dev-seed-password", "a-local-dev-seed-password-123");
 
         List<String> violations = ConfigurationPolicy.violations(settings::get, Set.of("prod"));
 
         assertEquals(List.of("campushub.dev-seed-enabled must be false in the prod profile"), violations);
+    }
+
+    @Test
+    void devSeedWithoutPasswordIsRefused() {
+        Map<String, String> settings = validSettings();
+        settings.put("campushub.dev-seed-enabled", "true");
+
+        List<String> violations = ConfigurationPolicy.violations(settings::get, Set.of("dev"));
+
+        assertEquals(List.of("campushub.dev-seed-password is missing"), violations);
+    }
+
+    @Test
+    void shortDevSeedPasswordIsRefusedWithoutEchoingTheValue() {
+        Map<String, String> settings = validSettings();
+        settings.put("campushub.dev-seed-enabled", "true");
+        settings.put("campushub.dev-seed-password", "short-pw");
+
+        List<String> violations = ConfigurationPolicy.violations(settings::get, Set.of("dev"));
+
+        assertEquals(List.of("campushub.dev-seed-password must be at least 12 characters"), violations);
+        assertFalse(violations.get(0).contains("short-pw"));
     }
 
     @Test
