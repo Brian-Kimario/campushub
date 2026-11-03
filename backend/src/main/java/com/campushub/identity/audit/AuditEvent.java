@@ -71,7 +71,31 @@ public class AuditEvent {
         return action;
     }
 
+    public Instant getOccurredAt() {
+        return occurredAt;
+    }
+
+    public UUID getActorId() {
+        return actorId;
+    }
+
+    public String getTargetType() {
+        return targetType;
+    }
+
+    public String getTargetId() {
+        return targetId;
+    }
+
     public AuditOutcome getOutcome() {
         return outcome;
+    }
+
+    public String getRequestId() {
+        return requestId;
+    }
+
+    public Map<String, Object> getMetadata() {
+        return metadata;
     }
 }
