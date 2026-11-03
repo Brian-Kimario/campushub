@@ -13,7 +13,7 @@
 - Phase 1 has the skeleton, configuration guard, RFC 9457 errors, health probes, Flyway V1 baseline, and four test classes (16 tests). One CI workflow exists (`.github/workflows/ci.yml`), validated locally but not run on GitHub. No feature code and no deployments exist.
 - No syllabus item is *evidenced* (SYLLABUS_MAPPING §4). All 20 rows are planned.
 - No measurement has been taken. SM-6 and the render-count profile are not measured.
-- The Phase 1 gate is awaiting the user's approval to start Phase 2. The evidence and the gaps are in §9.
+- The owner accepted the Phase 1 gate on 2026-11-03, with the open items recorded in §9 (CI not yet run on GitHub, R-22; secret scanning not in CI, R-23). Phase 2 is not started; it begins only on a separate instruction. The evidence and the gaps are in §9.
 
 ## 2. Phase 0 verification results
 

@@ -10,7 +10,7 @@
 | Phase | Name | Status (2026-11-03) |
 |---|---|---|
 | 0 | Discovery, repository foundation, and authoritative documentation | Documentation complete; Phase 0 review issued; **stopped for approval** |
-| 1 | Local infrastructure and backend skeleton | Complete locally; CI workflow added and validated locally (actionlint, `./mvnw verify`), **not yet run on GitHub** (no remote); gate evidence in IMPLEMENTATION_LOG §9; **stopped for approval** |
+| 1 | Local infrastructure and backend skeleton | **Accepted by the owner (2026-11-03)** with open items: CI validated locally (actionlint, `./mvnw verify`) but **not yet run on GitHub** (no remote, RISKS R-22); gate evidence in IMPLEMENTATION_LOG §9 |
 | 2 | Identity, roles, and security | Not started |
 | 3 | Academic catalog and profiles | Not started |
 | 4 | Projects and team membership | Not started |
