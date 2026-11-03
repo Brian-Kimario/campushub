@@ -80,7 +80,12 @@ export default function ProjectDetailPage() {
       <MilestonePanel project={project} isOwner={isOwner} isSupervisor={isSupervisor} />
       <TaskPanel project={project} isOwner={isOwner} />
       <TeamPanel project={project} isOwner={isOwner} />
-      <SubmissionPanel project={project} isOwner={isOwner} isSupervisor={isSupervisor} />
+      <SubmissionPanel
+        project={project}
+        isOwner={isOwner}
+        isSupervisor={isSupervisor}
+        evidenceAccess={user?.role === 'STUDENT' ? 'upload' : user?.role === 'ADMIN' ? 'none' : 'view'}
+      />
       {user?.role === 'ADMIN' && <ProjectAdminPanel project={project} onReload={() => void refetch()} />}
     </article>
   )

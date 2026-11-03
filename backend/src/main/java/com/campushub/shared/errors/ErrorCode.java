@@ -20,6 +20,8 @@ public enum ErrorCode {
     NOT_FOUND(HttpStatus.NOT_FOUND, "Resource not found"),
     STALE_VERSION(HttpStatus.CONFLICT, "Version conflict"),
     INVALID_TRANSITION(HttpStatus.CONFLICT, "Invalid state transition"),
+    VERSION_SEALED(HttpStatus.CONFLICT, "Version is sealed"),
+    FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "File is too large"),
     DUPLICATE(HttpStatus.CONFLICT, "Duplicate value"),
     TEAM_FULL(HttpStatus.CONFLICT, "Team is full"),
     PRECONDITION_NOT_MET(HttpStatus.UNPROCESSABLE_ENTITY, "Precondition not met"),
@@ -29,6 +31,8 @@ public enum ErrorCode {
     SUPERVISOR_NOT_ELIGIBLE(HttpStatus.UNPROCESSABLE_ENTITY, "Supervisor not eligible"),
     REVIEW_EXISTS(HttpStatus.CONFLICT, "Review already recorded"),
     FEEDBACK_REQUIRED(HttpStatus.UNPROCESSABLE_ENTITY, "Feedback required"),
+    FILE_TYPE_NOT_ALLOWED(HttpStatus.UNPROCESSABLE_ENTITY, "File type not allowed"),
+    FILE_LIMIT_EXCEEDED(HttpStatus.UNPROCESSABLE_ENTITY, "File limit exceeded"),
     RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Too many requests"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error"),
     DEPENDENCY_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Dependency unavailable");

@@ -7,6 +7,43 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [Phase E.3] — 2026-11-03 — Submission evidence files
+
+**Status:** Complete locally. Not pushed. Committed locally at the time of writing.
+
+**Affected documents:** `docs/CHANGELOG.md` (this entry), `docs/API_CONTRACT.md` (§10 MVP subset paragraph), `docs/MASTER_BLUEPRINT_COMPLIANCE.md` (FR-SUB-02, FR-SUB-03, FR-SUB-04, FR-CERT-02 rows, planned order). Code: `backend/src/main/resources/db/migration/V14__submission_files.sql`, `backend/src/main/java/com/campushub/infrastructure/storage/FileStorage.java`, `backend/src/main/java/com/campushub/submissions/` (`SubmissionFile*`, `EvidenceType`), `backend/src/main/java/com/campushub/shared/errors/` (four new codes), `frontend/src/features/submissions/EvidenceFiles.tsx`.
+
+**Changed (code):**
+- Flyway V14 creates `submission_files`: binary UUID id, `storage_key` (unique, never sent to the client), foreign keys to `submissions` and `users` with `RESTRICT`, a check on `size_bytes` (at least 1) and on `content_type` (PDF, PNG or JPEG), and an index on submission and upload time. No existing row is changed.
+- `FileStorage` writes each file under a random UUID key below a configured root, computes SHA-256 while streaming, and refuses any key that is not a UUID or does not resolve inside the root. Delete is best effort.
+- `POST /submissions/{id}/files` (multipart `file`, 201). Students who can write team work (owner or accepted member) can upload. Faculty get 403 `FORBIDDEN_ROLE`, and a stranger or an invisible project gets 404. Upload is refused with 409 `VERSION_SEALED` once review starts, and with 422 `PROJECT_ARCHIVED` on an archived project. The check order is: lock the submission row, visibility, role, team membership, archived, sealed, empty file, size, count, then content. The type is checked against the file's first bytes (PDF `%PDF-`, PNG and JPEG signatures), and the extension must match. Size is limited to 20 MiB and five files per revision by the service.
+- `GET /submissions/{id}/files` lists files ordered by upload time, for anyone who can see the project. Admins get 404.
+- `GET /submissions/{id}/files/{fileId}/content` streams the file as an attachment with `nosniff` and an audited `download` action. Admins and strangers get 404. A file ID from another submission gets 404.
+- Error codes added: `VERSION_SEALED` (409), `FILE_TOO_LARGE` (413), `FILE_TYPE_NOT_ALLOWED` (422), and `FILE_LIMIT_EXCEEDED` (422). An upload above the framework ceiling is also mapped to `FILE_TOO_LARGE`.
+- `spring.servlet.multipart` is set to 25 MB per file and 26 MB per request. The policy limit of 20 MiB is enforced in the service.
+- Frontend: each submission card shows an "Evidence files" section. Students get upload on the latest revision while it is SUBMITTED and the project is active. Other project members can view and download. Admins see no evidence section. Download uses an authenticated request, then an object URL.
+
+**Verified:**
+- `./mvnw -B verify`: 168 tests, 0 failures, BUILD SUCCESS. `SubmissionFileFlowIntegrationTest` (10 tests) covers owner upload, list and download with SHA-256 and headers; PNG and JPEG detection; a disguised text file refused with 422; a 20 MiB + 1 byte file refused with 413; a sixth file refused with 422; sealed after review start (409); faculty upload 403; supervisor download 200; stranger and admin 404; a file ID from another submission 404; and an archived project 422. `EvidenceTypeTest` (6) and `SubmissionFileNameTest` (3) cover the signature rules and filename sanitizing.
+- `npm run build` (`tsc -b` and `vite build`) and `npm run lint`: exit 0.
+- Local stack: the API container was rebuilt, and V14 applied to the existing dev database.
+- Built-in browser, as the student owner on a SUBMITTED revision: the upload control appeared only on the latest revision. A PNG was attached and listed with its size and time. Download returned 200 OK. A text file renamed `.png` was refused with the server's message and a reference ID. As the admin, the evidence section and upload control were absent.
+
+**Not verified:**
+- Faculty supervisor view in the browser. Covered by backend tests only.
+- The framework 25 MB multipart ceiling. MockMvc bypasses it, so the 413 path is tested through the service, not the container.
+- Audit rows. The download action is recorded in code but not asserted in tests.
+
+**Known gaps and deviations:**
+- Limits are per revision. There is no version entity, so the policy's "per version" becomes "per revision".
+- Files attach only while the revision is SUBMITTED. There is no DRAFT, so a submission does not require a file (FR-SUB-04 stays partial).
+- No DELETE endpoint for evidence files.
+- A missing `file` part returns the framework 400 without an `errorCode`.
+- Uploads are serialized by the submission row lock. A crash between the storage write and the database commit could leave an orphan file. A commit failure after the write deletes the stored file.
+- Admins get 404 on all file routes (ADR-007), which hides the feature from them.
+- No malware scanning.
+- Certification evidence (FR-CERT-02) is not built. It shares `FileStorage` but has no endpoints.
+
 ## [Phase E.2] — 2026-11-03 — Milestones and calendar deadlines
 
 **Status:** Complete locally. Not pushed. Not committed at the time of writing.

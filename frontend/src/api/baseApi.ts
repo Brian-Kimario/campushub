@@ -70,6 +70,7 @@ export const baseApi = createApi({
     'Task',
     'Milestone',
     'Submission',
+    'Evidence',
     'Faculty',
     'Skill',
     'OwnSkill',

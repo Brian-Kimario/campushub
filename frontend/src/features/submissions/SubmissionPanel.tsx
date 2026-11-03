@@ -6,6 +6,7 @@ import { applyFieldIssues, describeError, type ApiFailure } from '../../api/prob
 import type { Project, Submission, SubmissionStatus } from '../../api/types'
 import { emptyToNull, formatInstant, SUBMISSION_STATUS_LABELS } from '../../components/format'
 import { Badge, CharCount, EmptyState, ErrorBanner, ErrorState, PageLoading } from '../../components/ui'
+import { EvidenceFiles } from './EvidenceFiles'
 import { useCreateSubmissionMutation, useDecideReviewMutation, useListSubmissionsQuery, useStartReviewMutation } from './submissionsApi'
 
 const submissionSchema = z.object({
@@ -38,14 +39,19 @@ type ReviewValues = z.infer<typeof reviewSchema>
 const SUBMISSION_FIELDS = ['title', 'description', 'link'] as const
 const REVIEW_FIELDS = ['decision', 'feedback'] as const
 
+// 'upload' is for the owner, 'view' for other project members, and 'none' hides evidence (admins are concealed, ADR-007).
+export type EvidenceAccess = 'upload' | 'view' | 'none'
+
 export function SubmissionPanel({
   project,
   isOwner,
   isSupervisor,
+  evidenceAccess,
 }: {
   project: Project
   isOwner: boolean
   isSupervisor: boolean
+  evidenceAccess: EvidenceAccess
 }) {
   const { data: submissions, error, isLoading, refetch } = useListSubmissionsQuery(project.id)
   const [startReview, { isLoading: starting }] = useStartReviewMutation()
@@ -118,6 +124,14 @@ export function SubmissionPanel({
               </p>
               {submission.description && <p className="pre-wrap">{submission.description}</p>}
               {submission.feedback && <p className="banner banner-info">Feedback: {submission.feedback}</p>}
+
+              {evidenceAccess !== 'none' && (
+                <EvidenceFiles
+                  submission={submission}
+                  // The server accepts files only while the revision is SUBMITTED and the project is active.
+                  canUpload={evidenceAccess === 'upload' && isLatest && submission.status === 'SUBMITTED' && !archived}
+                />
+              )}
 
               {canReview && isLatest && submission.status === 'SUBMITTED' && (
                 <button type="button" disabled={starting} onClick={() => void handleStartReview(submission.id)}>

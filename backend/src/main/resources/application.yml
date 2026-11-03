@@ -13,6 +13,11 @@ spring:
     user: ${CAMPUSHUB_DB_MIGRATION_USER:}
     password: ${CAMPUSHUB_DB_MIGRATION_PASSWORD:}
     locations: classpath:db/migration
+  servlet:
+    multipart:
+      # Framework ceiling above campushub.upload.max-file-bytes (20 MiB). The service enforces the policy limit with a 413.
+      max-file-size: 25MB
+      max-request-size: 26MB
   jpa:
     open-in-view: false
     hibernate:

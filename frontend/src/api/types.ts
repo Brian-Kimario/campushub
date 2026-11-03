@@ -105,6 +105,18 @@ export interface Submission {
   version: number
 }
 
+/** Evidence on a submission. The storage key is never sent to the client. */
+export interface SubmissionFile {
+  id: string
+  submissionId: string
+  originalName: string
+  contentType: string
+  sizeBytes: number
+  sha256: string
+  uploadedBy: string
+  uploadedAt: string
+}
+
 export type SkillProficiency = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'EXPERT'
 
 export interface Skill {

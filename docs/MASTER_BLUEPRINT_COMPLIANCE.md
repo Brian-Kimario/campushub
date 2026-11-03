@@ -104,9 +104,9 @@ The earlier summary said the MVP covers "P0 basics". That is only partly accurat
 | ID | Requirement | Status | Evidence | Remaining work | Priority |
 |---|---|---|---|---|---|
 | FR-SUB-01 | Member creates submission for an open milestone | Partial | `POST /projects/{id}/submissions` creates a revision | No milestone, so "one per milestone" cannot apply. | P0 |
-| FR-SUB-02 | Members upload files (≤5 per version, ≤20 MB, magic-byte type check) | Missing | V6 says "no files"; `infrastructure/storage` contains only a health indicator | Storage, upload endpoint, type and size checks. | P0 |
-| FR-SUB-03 | Downloads only by authorized actors, audited | Missing | No download endpoint | Download endpoint with per-file authorization and audit. | P0 |
-| FR-SUB-04 | Submit seals the draft; needs ≥1 file | Partial | Revision is sealed on creation (V6) | No DRAFT and no files. | P0 |
+| FR-SUB-02 | Members upload files (≤5 per version, ≤20 MB, magic-byte type check) | Partial | V14 `submission_files`; `POST /submissions/{id}/files` (students who can write team work, SUBMITTED revisions only); `FileStorage` writes under a UUID key; PDF, PNG and JPEG by magic byte; 20 MiB and 5 files per revision enforced in the service; tests in `SubmissionFileFlowIntegrationTest` | Limits are per revision, not per "version" (no version entity). Faculty cannot upload. No DRAFT, so files attach after submit. Framework 25 MB multipart ceiling not exercised by MockMvc. No malware scan. | P0 |
+| FR-SUB-03 | Downloads only by authorized actors, audited | Partial | `GET /submissions/{id}/files/{fileId}/content`: project visibility and per-file checks; admins get 404; `ATTACHMENT` disposition with `nosniff`; audited in `download` | Audit rows are not asserted in tests. Download is not paged or rate-limited. | P0 |
+| FR-SUB-04 | Submit seals the draft; needs ≥1 file | Partial | Revision is sealed on creation (V6); files stop at SUBMITTED for a sealed revision (409 `VERSION_SEALED` on upload after review starts) | No DRAFT. A submission does not require a file, so the ≥1 rule is not enforced. | P0 |
 | FR-SUB-05 | Deadline enforced; `allowLate` | Missing | Submission has no milestone deadline | Depends on FR-MS-01. | P0 |
 | FR-SUB-06 | Resubmission creates a new version | Implemented | Revisions with `UNIQUE (project_id, revision_no)`; `CHANGES_REQUESTED` flow in `SubmissionFlowIntegrationTest` | None found. | P0 |
 | FR-SUB-07 | Submitted content never replaced | Implemented | No edit endpoint for submissions; V6 check constraints | None found. | P0 |
@@ -122,7 +122,7 @@ The earlier summary said the MVP covers "P0 basics". That is only partly accurat
 | FR-SKILL-01 | Skill catalog readable and paginated | Implemented | `GET /skills`; `POST /admin/skills` | Pagination shape: UNVERIFIED. | P1 |
 | FR-SKILL-02 | Set own skills with proficiency and note | Implemented | `PUT /users/me/skills`; `SkillFlowIntegrationTest` | Note length ≤500: UNVERIFIED. | P1 |
 | FR-CERT-01 | Create, list, delete own certifications | Partial | `/users/me/certifications` CRUD; `credentialUrl` stored | Required fields and HTTPS check: UNVERIFIED. Evidence file removal depends on FR-CERT-02. | P1 |
-| FR-CERT-02 | Certification evidence files | Missing | No file storage | Depends on FR-SUB-02 storage. | P1 |
+| FR-CERT-02 | Certification evidence files | Missing | Shared `FileStorage` exists from FR-SUB-02, but no certification file endpoints | Certification upload and download with owner-only authorization and the same type and size checks. | P1 |
 | FR-CERT-03 | Certifications owner-private | Implemented | Owner-scoped repository queries | Non-owner 404 test: UNVERIFIED. | P1 |
 
 ## 9. Dashboards
@@ -176,7 +176,7 @@ The earlier summary said the MVP covers "P0 basics". That is only partly accurat
 
 1. Task assignment (FR-TASK-02, FR-TEAM-03). Done; see CHANGELOG "Phase E.1 and E.5".
 2. Milestones (FR-MS-01 to 03, FR-CAL-01 milestone deadlines, FR-PROJ-09 display). Done locally; see CHANGELOG "Phase E.2". FR-MS-03 submission rejection depends on item 3.
-3. Submission evidence files (FR-SUB-02 to 05, FR-CERT-02 storage).
+3. Submission evidence files (FR-SUB-02 to 05, FR-CERT-02 storage). Done locally for FR-SUB-02 and FR-SUB-03; see CHANGELOG "Phase E.3". FR-CERT-02 and the FR-SUB-04 file rule remain open.
 4. Invitation lifecycle tests (FR-TEAM-01 to 04).
 5. Task pagination in the UI.
 6. Database-backed notifications with read state (not in REQUIREMENTS.md, added for the release brief).
