@@ -7,6 +7,30 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [Phase B and C] — 2026-11-03 — Project membership, invitations, and academic calendar
+
+**Status:** Complete locally. Committed on `phase-7a-certifications` (`9d4c6fd` membership backend, `c65a7c3` calendar backend, `b13091f` frontend). Not pushed. No edit to an applied migration.
+
+**Affected documents:** `docs/API_CONTRACT.md` §6.1 (members and invitations, with deviations) and §9 (calendar, with deviations); `docs/DATA_MODEL.md` (header, §5.2, §5.3, §11 V11 row); `docs/CHANGELOG.md` (this entry).
+
+**Changed (code):**
+- Flyway V11 adds `project_members` (MEMBER rows only) and `project_invitations`. `pending_key` is a generated column with a unique index, so only one PENDING invitation exists per project and invitee.
+- Membership endpoints: list members, remove member (owner only), invite by email (owner only), list invitations (owner only), `GET /invitations/mine`, accept and decline (invitee only; other callers get 404). Team cap of five counts the owner. Removal revokes access at once.
+- `GET /calendar?from=&to=` returns project and task due dates visible to the caller. Range ≤ 92 days.
+- Frontend: team panel on the project page (member list, invite form, invitation list), invitations page for students with accept and decline, calendar page with a monthly grid, previous, next, and today navigation, and selected-day deadline details.
+
+**Verified:**
+- `./mvnw -B verify`: 136 tests, 0 failures, BUILD SUCCESS. Includes 7 membership tests and 4 calendar tests.
+- `npm run build` (`tsc -b` and `vite build`) and `npm run lint`: exit 0.
+- Built-in browser, logged-out session: `/calendar` redirects to `/login`. The one console error is the expected 401 from the unauthenticated session check.
+
+**Not verified:** the team, invitation, and calendar screens in a browser with real data (Phase A sign-in is blocked until the demo password is supplied).
+
+**Known gaps:**
+- Removing a member does not unassign their open tasks. The contract text was written to require it, so this is open work before release.
+- Invitation expiry is derived on read; the scheduled expiry job is not built.
+- The calendar has no milestone deadlines (milestones are not in the schema).
+
 ## [Phase 9.1 and 10] — 2026-11-03 — Certification editing and dashboards
 
 **Status:** Complete locally. Not committed or pushed. No database reset, no edit to an applied migration.

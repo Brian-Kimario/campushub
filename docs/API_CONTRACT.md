@@ -163,14 +163,14 @@ Catalog GET responses are cached (ADR-010). Every admin write evicts the affecte
 | Method | Path | Who | Purpose | Notes |
 |---|---|---|---|---|
 | GET | `/projects/{id}/members` | member, supervisor, admin | List | Basic profile fields only |
-| DELETE | `/projects/{id}/members/{userId}` | owner | Remove member | 204; cannot remove owner (422 `PRECONDITION_NOT_MET`); unassigns their open tasks in the same transaction |
-| POST | `/projects/{id}/invitations` | owner | Invite | 201; body `inviteeId`; invitee must be ACTIVE STUDENT; 409 `TEAM_FULL`; 409 `DUPLICATE` if already a member or PENDING |
-| GET | `/projects/{id}/invitations` | owner, ADMIN | List | Paginated |
+| DELETE | `/projects/{id}/members/{userId}` | owner | Remove member | 204; cannot remove owner (422 `PRECONDITION_NOT_MET`). Removal revokes access at once. **Deviation (not built):** open tasks assigned to the removed member are not yet unassigned; this is open work before release |
+| POST | `/projects/{id}/invitations` | owner | Invite | 201; **deviation:** body carries `inviteeEmail`, not `inviteeId`; the invitee must be an ACTIVE STUDENT (otherwise 400 `VALIDATION_FAILED` on `inviteeEmail`); 409 `TEAM_FULL`; 409 `DUPLICATE` if already a member or PENDING |
+| GET | `/projects/{id}/invitations` | owner | List | Paginated. **Deviation:** ADMIN does not see invitation lists in this build |
 | GET | `/invitations/mine` | STUDENT | Own invitations | Paginated; `status` filter |
 | POST | `/invitations/{id}/accept` | invitee | Accept | 200; creates membership in one transaction; 409 `TEAM_FULL`; 422 `PROJECT_NOT_OPEN_FOR_MEMBERSHIP`; 404 for non-invitee |
 | POST | `/invitations/{id}/decline` | invitee | Decline | 200; 404 for non-invitee |
 
-Invitations expire 14 days after creation. Expiry is applied on read and by an hourly job (DATA_MODEL §5.3).
+Invitations expire 14 days after creation. Expiry is derived on read; the hourly expiry job in DATA_MODEL §5.3 is not built yet.
 
 ## 7. Milestone endpoints
 
@@ -201,9 +201,9 @@ Task `status` is never writable through `PATCH /tasks/{id}`; sending it there re
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
-| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | any authenticated | Milestones (`type: MILESTONE_DUE`) and tasks (`type: TASK_DUE`) visible to the caller |
+| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | any authenticated | Project due dates (`type: PROJECT_DUE`) and task due dates (`type: TASK_DUE`) visible to the caller |
 
-Rules: `from` and `to` required; `to >= from`; range ≤ 92 days (400 `RANGE_TOO_LARGE`). Items carry UTC instants; the client converts to the user's time zone (ADR-013). Visibility: a student sees items in projects where they are members and tasks assigned to them; faculty sees supervised projects; admins see all.
+Rules: `from` and `to` required; `to >= from` (otherwise 400 `VALIDATION_FAILED`); range ≤ 92 days (400 `RANGE_TOO_LARGE`). **Deviations:** milestones are not in the schema, so there is no `MILESTONE_DUE` type; items carry a `date` as a calendar day (`LocalDate`, no zone shift), not UTC instants. Visibility uses the same project visibility rule as the rest of the API: a project or task appears only when its project is visible to the caller. Admins see all.
 
 ## 10. Submission and review endpoints
 

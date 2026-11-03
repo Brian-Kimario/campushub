@@ -1,7 +1,7 @@
 # CampusHub — Data Model
 
 **Purpose:** Authoritative relational schema: tables, keys, constraints, indexes, and invariants enforced by the database.
-**Scope:** MySQL 8 schema targeted by Flyway migrations V1–V10 (Phases 1–9.1). P2 tables are listed but not migrated until Phase 8.
+**Scope:** MySQL 8 schema targeted by Flyway migrations V1–V11 (Phases 1–10 and Phase B). P2 tables are listed but not migrated until Phase 8.
 **Last reviewed:** 2026-11-03 (Phase 0)
 **Related:** [ERD.md](ERD.md) (diagram), [STATE_MACHINES.md](STATE_MACHINES.md) (status values), [API_CONTRACT.md](API_CONTRACT.md).
 
@@ -144,30 +144,40 @@ Invariants:
 
 ### 5.2 `project_members`
 
+Built in V11. Holds MEMBER rows only; the owner is not a membership row.
+
 | Column | Type | Notes |
 |---|---|---|
+| `id` | BINARY(16) | PK |
 | `project_id` | BINARY(16) | FK → `projects` RESTRICT |
 | `user_id` | BINARY(16) | FK → `users` RESTRICT |
-| `membership_role` | VARCHAR(16) | CHECK in (`OWNER`,`MEMBER`) |
+| `role` | VARCHAR(16) | DEFAULT `MEMBER`; CHECK in (`MEMBER`) |
 | `joined_at` | DATETIME(6) | |
 
-PK `(project_id, user_id)`. Index `ix_members_user (user_id, project_id)` for "my projects" queries.
-Invariants: exactly one `OWNER` row per project, enforced by a generated column `owner_key = CASE WHEN membership_role='OWNER' THEN project_id END` with `UNIQUE (owner_key)`. A member count cap (5, OD-3) is enforced in the service inside a locked project row transaction, not by the database.
+`UNIQUE (project_id, user_id)`. Index `ix_project_members_user (user_id)` for "my projects" queries.
+Invariants: the owner is `projects.owner_id`, so there is no `OWNER` row and no owner-key column. The team cap of five (owner included) is enforced in the service inside a locked project row (`PESSIMISTIC_WRITE`), not by the database.
+
+**Deviation from the earlier draft of this section:** the draft described an `OWNER` membership row, a `membership_role` column, and an `owner_key` generated column. None of those were built.
 
 ### 5.3 `project_invitations`
+
+Built in V11.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | BINARY(16) | PK |
 | `project_id` | BINARY(16) | FK RESTRICT |
 | `invitee_id` | BINARY(16) | FK RESTRICT |
-| `invited_by` | BINARY(16) | FK RESTRICT |
+| `inviter_id` | BINARY(16) | FK RESTRICT |
 | `status` | VARCHAR(16) | CHECK in (`PENDING`,`ACCEPTED`,`DECLINED`,`EXPIRED`) |
 | `expires_at` | DATETIME(6) | `created_at + 14 days` |
+| `created_at` | DATETIME(6) | |
 | `responded_at` | DATETIME(6) | nullable |
-| `pending_key` | VARCHAR(80) | generated: `CASE WHEN status='PENDING' THEN CONCAT(project_id,':',invitee_id) END` |
+| `pending_key` | VARCHAR(64) | generated, stored: `CASE WHEN status='PENDING' THEN CONCAT(HEX(project_id), HEX(invitee_id)) END` |
+| `version` | INT | optimistic lock |
 
-`UNIQUE (pending_key)` allows at most one PENDING invitation per project and invitee while leaving historical rows unconstrained. Expired invitations are transitioned to `EXPIRED` lazily on read and by an hourly job.
+`UNIQUE (pending_key)` allows at most one PENDING invitation per project and invitee while leaving historical rows unconstrained. A CHECK forbids inviting yourself.
+Expiry is derived on read: a PENDING invitation past `expires_at` is treated as expired. The stored `status` is not yet moved to `EXPIRED` by a job; the hourly expiry job described earlier is not built.
 
 ## 6. Milestones, tasks, and activity
 
@@ -291,6 +301,7 @@ Every list endpoint has a bounded page size and a sort allowlist. Phase 9 verifi
 | `V8__skills.sql` | `skills`, `user_skills` (Phase 5B) | 5B |
 | `V9__certifications.sql` | `certifications`; `certification_files` waits for the storage layer | 7a |
 | `V10__certification_edit.sql` | `certifications.expires_on`, `credential_id`, `version`; expiry and credential ID CHECKs (V9 is applied, so no edit) | 9.1 |
+| `V11__project_membership.sql` | `project_members` (MEMBER rows only; owner stays in `projects.owner_id`), `project_invitations` with generated `pending_key` and unique index | B |
 | `outbox_events` (P2) | Not migrated yet; planned for Phase 8 | 8 |
 
 Rules: migrations are never edited after merge; corrections are new migrations. Each migration has a rollback note in its header comment and a test that applies all migrations to an empty database (NFR-DATA-01).
