@@ -12,6 +12,8 @@ export interface TaskFields {
   description: string | null
   priority: TaskPriority
   dueDate: string | null
+  /** Null unassigns. The request is full-field, so the form always sends the current value. */
+  assigneeId: string | null
 }
 
 export interface CreateTaskArgs extends TaskFields {

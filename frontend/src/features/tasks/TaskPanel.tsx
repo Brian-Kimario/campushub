@@ -6,12 +6,13 @@ import { describeError, type ApiFailure } from '../../api/problem'
 import type { Project, Task, TaskStatus } from '../../api/types'
 import { formatDate, TASK_PRIORITY_LABELS, TASK_STATUS_LABELS } from '../../components/format'
 import { Badge, CharCount, ConfirmDialog, EmptyState, ErrorBanner, ErrorState, PageLoading } from '../../components/ui'
+import { useListMembersQuery } from '../projects/membershipApi'
 import { ALLOWED_TRANSITIONS, needsConfirmation, TRANSITION_LABELS, taskTone } from './taskRules'
 import { TaskForm } from './TaskForm'
 import { useListTasksQuery, useTransitionTaskMutation } from './tasksApi'
 
-// The API returns pages of 50 here. The panel says how many are hidden instead of paging (Stage 4 scope).
-const TASK_PAGE_SIZE = 50
+// Matches the API default page size. Pages are fetched on demand, so no task is hidden.
+const TASK_PAGE_SIZE = 20
 
 const blockSchema = z.object({
   reason: z
@@ -23,11 +24,13 @@ const blockSchema = z.object({
 
 export function TaskPanel({ project, isOwner }: { project: Project; isOwner: boolean }) {
   const canManage = isOwner && project.status === 'ACTIVE'
-  const { data, error, isLoading, refetch } = useListTasksQuery({
+  const [page, setPage] = useState(0)
+  const { data, error, isLoading, isFetching, refetch } = useListTasksQuery({
     projectId: project.id,
-    page: 0,
+    page,
     size: TASK_PAGE_SIZE,
   })
+  const members = useListMembersQuery(project.id)
   const [transitionTask, { isLoading: transitioning }] = useTransitionTaskMutation()
   const [creating, setCreating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -39,7 +42,9 @@ export function TaskPanel({ project, isOwner }: { project: Project; isOwner: boo
   if (error) return <ErrorState message={describeError(error).message} onRetry={refetch} />
 
   const tasks = data?.content ?? []
-  const hiddenCount = data ? data.totalElements - tasks.length : 0
+  const memberNames = new Map<string, string>(
+    (members.data ?? []).map((member) => [member.userId, member.displayName ?? 'Team member']),
+  )
 
   async function runTransition(task: Task, to: TaskStatus, blockedReason?: string) {
     setFailure(null)
@@ -100,7 +105,8 @@ export function TaskPanel({ project, isOwner }: { project: Project; isOwner: boo
                   <Badge tone={taskTone(task.status)}>{TASK_STATUS_LABELS[task.status]}</Badge>
                 </div>
                 <p className="muted">
-                  Priority {TASK_PRIORITY_LABELS[task.priority]} · Due {formatDate(task.dueDate)}
+                  Priority {TASK_PRIORITY_LABELS[task.priority]} · Due {formatDate(task.dueDate)} · Assignee{' '}
+                  {task.assigneeId ? (memberNames.get(task.assigneeId) ?? 'Team member') : 'Unassigned'}
                 </p>
                 {task.description && <p className="pre-wrap">{task.description}</p>}
                 {task.status === 'BLOCKED' && task.blockedReason && (
@@ -132,10 +138,22 @@ export function TaskPanel({ project, isOwner }: { project: Project; isOwner: boo
         ))}
       </ul>
 
-      {hiddenCount > 0 && (
-        <p className="muted">
-          Showing the first {tasks.length} of {data?.totalElements} tasks.
-        </p>
+      {data && data.totalPages > 1 && (
+        <nav className="pager" aria-label="Task pagination">
+          <button type="button" onClick={() => setPage(page - 1)} disabled={page === 0 || isFetching}>
+            Previous
+          </button>
+          <span>
+            Page {page + 1} of {data.totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage(page + 1)}
+            disabled={page + 1 >= data.totalPages || isFetching}
+          >
+            Next
+          </button>
+        </nav>
       )}
 
       <ConfirmDialog

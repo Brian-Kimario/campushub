@@ -65,6 +65,7 @@ export interface Task {
   dueDate?: string
   completedAt?: string
   createdBy: string
+  assigneeId?: string | null
   version: number
   createdAt: string
   updatedAt: string
