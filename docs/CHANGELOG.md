@@ -7,6 +7,38 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [Phase E.4] — 2026-11-03 — Invitation lifecycle tests and stale-invitation fix
+
+**Status:** Complete locally. Not pushed. Committed locally at the time of writing.
+
+**Affected documents:** `docs/CHANGELOG.md` (this entry), `docs/MASTER_BLUEPRINT_COMPLIANCE.md` (FR-TEAM-01, FR-TEAM-02 rows, planned order item 4). Code: `backend/src/main/java/com/campushub/projects/MembershipService.java`, `ProjectInvitation.java`, `ProjectInvitationRepository.java`, `backend/src/test/java/com/campushub/projects/MembershipFlowIntegrationTest.java`.
+
+**Changed (code):**
+- `MembershipService.invite` now stores an expired PENDING invitation for the same invitee as EXPIRED before its duplicate check, under the project lock. Before this change, an invitation past its 14-day deadline still blocked a new one (409 `DUPLICATE`), because expiry was only derived on read and the stored row stayed PENDING.
+- `ProjectInvitation.expire()` sets EXPIRED and leaves `respondedAt` empty. `ProjectInvitationRepository` gains `findByProjectIdAndInviteeIdAndStatus`.
+- No schema change. No migration added.
+
+**Verified:**
+- Before the fix, the new test `expiredInvitationDoesNotBlockANewInvitation` failed with 409 where 201 was expected. That confirmed the bug.
+- `./mvnw -B verify`: 174 tests, 0 failures, BUILD SUCCESS (168 before E.4 plus 6 new tests).
+- New tests in `MembershipFlowIntegrationTest`:
+  - An expired invitation cannot be accepted or declined (409 `INVALID_TRANSITION`), and the invitee's list shows EXPIRED.
+  - An expired invitation does not block a new one, and the new one can be accepted.
+  - An answered invitation cannot be answered again: accept twice, decline after accept, and accept after decline all return 409 `INVALID_TRANSITION`.
+  - Inviting an existing member returns 409 `DUPLICATE`.
+  - Five invitations with four accepted: the fifth accept returns 409 `TEAM_FULL`, and the invitation stays PENDING.
+  - After a member is removed, the old ACCEPTED invitation cannot be accepted again, and a new invitation can be accepted.
+
+**Not verified:**
+- Browser flow for invitations. Covered by backend tests only.
+- The hourly expiry job. It is not built, so no test covers it.
+
+**Known gaps and deviations:**
+- No revoke endpoint for a PENDING invitation (STATE_MACHINES §6). An owner waits for the 14-day expiry or asks an administrator. Recorded in RISKS.
+- Expiry is lazy. It is applied on read, and a stale row is stored as EXPIRED on the next invite to the same person. The hourly job in DATA_MODEL §5.3 is not built, so rows that are never re-invited stay PENDING in storage, although reads report them as EXPIRED.
+- Pending invitations do not reserve seats. The owner can have more pending invitations than free seats. The cap is enforced when each one is accepted, under the project lock, so the surplus accept fails with 409 `TEAM_FULL`.
+- Invitee-must-be-ACTIVE-student check is still UNVERIFIED for the browser path.
+
 ## [Phase E.3] — 2026-11-03 — Submission evidence files
 
 **Status:** Complete locally. Not pushed. Committed locally at the time of writing.

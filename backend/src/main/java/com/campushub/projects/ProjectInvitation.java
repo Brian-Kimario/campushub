@@ -69,6 +69,11 @@ public class ProjectInvitation {
         this.respondedAt = now;
     }
 
+    /** Stores the expiry that effectiveStatus already reports. Nobody answered, so respondedAt stays empty. */
+    public void expire() {
+        this.status = InvitationStatus.EXPIRED;
+    }
+
     public UUID getId() {
         return id;
     }

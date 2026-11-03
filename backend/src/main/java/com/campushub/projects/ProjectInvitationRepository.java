@@ -12,6 +12,8 @@ public interface ProjectInvitationRepository extends JpaRepository<ProjectInvita
 
     boolean existsByProjectIdAndInviteeIdAndStatus(UUID projectId, UUID inviteeId, InvitationStatus status);
 
+    Optional<ProjectInvitation> findByProjectIdAndInviteeIdAndStatus(UUID projectId, UUID inviteeId, InvitationStatus status);
+
     Page<ProjectInvitation> findByProjectIdOrderByCreatedAtDescIdAsc(UUID projectId, Pageable pageable);
 
     Page<ProjectInvitation> findByInviteeIdOrderByCreatedAtDescIdAsc(UUID inviteeId, Pageable pageable);

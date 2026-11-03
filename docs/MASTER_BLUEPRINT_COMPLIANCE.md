@@ -72,8 +72,8 @@ The earlier summary said the MVP covers "P0 basics". That is only partly accurat
 | FR-PROJ-08 | Lists scoped by membership and supervision | Partial | `ProjectService.canSee`; list by status | Term filter missing. Pagination exists. | P0 |
 | FR-PROJ-09 | Detail shows members, milestones, supervisor, progress | Partial | `ProjectDetailPage`: members, supervisor, status, milestones, tasks | Progress metric: UNVERIFIED. | P0 |
 | FR-PROJ-10 | Status change and audit are atomic | Implemented | `AuditService` writes in the service transaction | Rollback-on-audit-failure test: UNVERIFIED. | P0 |
-| FR-TEAM-01 | Owner invites an ACTIVE student | Implemented | `POST /projects/{id}/invitations`; `pending_key` unique index (V11); 5-person cap; 14-day expiry | Invitee-must-be-ACTIVE-student check: UNVERIFIED. | P0 |
-| FR-TEAM-02 | Invitee accepts or declines | Implemented | `POST /invitations/{id}/accept` and `/decline`; team-full returns 409 under project lock | None found. | P0 |
+| FR-TEAM-01 | Owner invites an ACTIVE student | Implemented | `POST /projects/{id}/invitations`; `pending_key` unique index (V11); 5-person cap; 14-day expiry; expired pending row is stored as EXPIRED on re-invite (E.4) | Invitee-must-be-ACTIVE-student check: UNVERIFIED. No revoke endpoint for a pending invitation (STATE_MACHINES §6). Expiry is not stored by an hourly job. Tests: `expiredInvitationDoesNotBlockANewInvitation`, `existingMemberCannotBeInvitedAgain`, `teamSeatsAreCheckedWhenInvitationsAreAccepted`, `removedMemberCanBeInvitedAgainAndOldInvitationStaysAnswered` (`MembershipFlowIntegrationTest`). | P0 |
+| FR-TEAM-02 | Invitee accepts or declines | Implemented | `POST /invitations/{id}/accept` and `/decline`; team-full returns 409 under project lock | Expired and repeat answers return 409 `INVALID_TRANSITION`. Tests: `expiredInvitationCannotBeAnsweredAndShowsAsExpired`, `answeredInvitationCannotBeAnsweredAgain` (`MembershipFlowIntegrationTest`). Browser flow: UNVERIFIED. | P0 |
 | FR-TEAM-03 | Owner removes a member, unassigns their open tasks | Implemented | `DELETE /projects/{id}/members/{userId}`; `MembershipService.removeMember` calls `TaskRepository.unassignOpenTasks`; owner removal blocked | Backend test `removingAMemberClearsOnlyTheirOpenAssignments`. Removal in the browser: UNVERIFIED. | P0 |
 | FR-TEAM-04 | No invitation to COMPLETED or ARCHIVED project | Partial | `PROJECT_NOT_OPEN_FOR_MEMBERSHIP` for ARCHIVED | COMPLETED state does not exist. | P0 |
 
@@ -177,7 +177,7 @@ The earlier summary said the MVP covers "P0 basics". That is only partly accurat
 1. Task assignment (FR-TASK-02, FR-TEAM-03). Done; see CHANGELOG "Phase E.1 and E.5".
 2. Milestones (FR-MS-01 to 03, FR-CAL-01 milestone deadlines, FR-PROJ-09 display). Done locally; see CHANGELOG "Phase E.2". FR-MS-03 submission rejection depends on item 3.
 3. Submission evidence files (FR-SUB-02 to 05, FR-CERT-02 storage). Done locally for FR-SUB-02 and FR-SUB-03; see CHANGELOG "Phase E.3". FR-CERT-02 and the FR-SUB-04 file rule remain open.
-4. Invitation lifecycle tests (FR-TEAM-01 to 04).
+4. Invitation lifecycle tests (FR-TEAM-01 to 04). Done locally; see CHANGELOG "Phase E.4". Found and fixed a stale-invitation bug. Revoke endpoint still missing (RISKS).
 5. Task pagination in the UI.
 6. Database-backed notifications with read state (not in REQUIREMENTS.md, added for the release brief).
 7. Outbox and Kafka: deferred unless time remains; see the checkpoint report.

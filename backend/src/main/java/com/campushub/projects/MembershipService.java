@@ -122,6 +122,7 @@ public class MembershipService {
                 .orElseThrow(() -> ApiException.withErrors(ErrorCode.VALIDATION_FAILED,
                         "One or more fields are invalid.",
                         List.of(Map.of("field", "inviteeEmail", "reason", "This person cannot be invited."))));
+        expireStalePending(locked.getId(), invitee.getId(), now);
         if (members.existsByProjectIdAndUserId(locked.getId(), invitee.getId())
                 || invitations.existsByProjectIdAndInviteeIdAndStatus(locked.getId(), invitee.getId(),
                         InvitationStatus.PENDING)) {
@@ -223,6 +224,20 @@ public class MembershipService {
             throw new ApiException(ErrorCode.INVALID_TRANSITION, "This invitation has already been answered.");
         }
         return invitation;
+    }
+
+    /**
+     * Expiry is derived on read, but no hourly job stores it yet (see CHANGELOG E.4). A stored PENDING row
+     * past its deadline would otherwise block a fresh invitation through the duplicate check and the
+     * pending_key unique index, so it is stored as EXPIRED here, under the project lock.
+     */
+    private void expireStalePending(UUID projectId, UUID inviteeId, Instant now) {
+        invitations.findByProjectIdAndInviteeIdAndStatus(projectId, inviteeId, InvitationStatus.PENDING)
+                .filter(stale -> stale.effectiveStatus(now) == InvitationStatus.EXPIRED)
+                .ifPresent(stale -> {
+                    stale.expire();
+                    invitations.saveAndFlush(stale);
+                });
     }
 
     private long teamSize(Project project) {

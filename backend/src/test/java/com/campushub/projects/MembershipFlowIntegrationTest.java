@@ -10,7 +10,10 @@ import com.campushub.identity.Role;
 import com.campushub.identity.UserAccount;
 import com.campushub.identity.UserAccountRepository;
 import com.jayway.jsonpath.JsonPath;
+import java.nio.ByteBuffer;
 import java.nio.file.Path;
+import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -18,6 +21,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -74,6 +78,9 @@ class MembershipFlowIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private static RequestPostProcessor fromNewAddress() {
         String address = "10.9." + (int) (Math.random() * 250) + "." + (int) (Math.random() * 250);
@@ -251,5 +258,149 @@ class MembershipFlowIntegrationTest {
         mockMvc.perform(delete(PROJECTS + "/" + projectId + "/members/" + owner.getId())
                         .header(AUTHORIZATION, ownerToken))
                 .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void expiredInvitationCannotBeAnsweredAndShowsAsExpired() throws Exception {
+        String ownerToken = tokenFor(account(Role.STUDENT, "Owner"));
+        UserAccount invitee = account(Role.STUDENT, "Late Invitee");
+        String inviteeToken = tokenFor(invitee);
+        String projectId = createdProject(ownerToken, "Expiry Project");
+        String invitationId = invitationFor(ownerToken, projectId, invitee);
+        expireInvitation(invitationId);
+
+        mockMvc.perform(get(MINE).header(AUTHORIZATION, inviteeToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].status").value("EXPIRED"));
+
+        mockMvc.perform(post("/api/v1/invitations/" + invitationId + "/accept").header(AUTHORIZATION, inviteeToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_TRANSITION"));
+
+        mockMvc.perform(post("/api/v1/invitations/" + invitationId + "/decline").header(AUTHORIZATION, inviteeToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_TRANSITION"));
+
+        mockMvc.perform(get(PROJECTS + "/" + projectId).header(AUTHORIZATION, inviteeToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void expiredInvitationDoesNotBlockANewInvitation() throws Exception {
+        String ownerToken = tokenFor(account(Role.STUDENT, "Owner"));
+        UserAccount invitee = account(Role.STUDENT, "Second Chance");
+        String inviteeToken = tokenFor(invitee);
+        String projectId = createdProject(ownerToken, "Reinvite Project");
+        expireInvitation(invitationFor(ownerToken, projectId, invitee));
+
+        String freshId = invitationFor(ownerToken, projectId, invitee);
+
+        mockMvc.perform(post("/api/v1/invitations/" + freshId + "/accept").header(AUTHORIZATION, inviteeToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACCEPTED"));
+    }
+
+    @Test
+    void answeredInvitationCannotBeAnsweredAgain() throws Exception {
+        String ownerToken = tokenFor(account(Role.STUDENT, "Owner"));
+        UserAccount accepting = account(Role.STUDENT, "Accepting");
+        UserAccount declining = account(Role.STUDENT, "Declining");
+        String acceptingToken = tokenFor(accepting);
+        String decliningToken = tokenFor(declining);
+        String projectId = createdProject(ownerToken, "Answered Project");
+        String acceptedId = invitationFor(ownerToken, projectId, accepting);
+        String declinedId = invitationFor(ownerToken, projectId, declining);
+
+        mockMvc.perform(post("/api/v1/invitations/" + acceptedId + "/accept").header(AUTHORIZATION, acceptingToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/invitations/" + acceptedId + "/accept").header(AUTHORIZATION, acceptingToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_TRANSITION"));
+        mockMvc.perform(post("/api/v1/invitations/" + acceptedId + "/decline").header(AUTHORIZATION, acceptingToken))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(post("/api/v1/invitations/" + declinedId + "/decline").header(AUTHORIZATION, decliningToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/invitations/" + declinedId + "/accept").header(AUTHORIZATION, decliningToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_TRANSITION"));
+    }
+
+    @Test
+    void existingMemberCannotBeInvitedAgain() throws Exception {
+        String ownerToken = tokenFor(account(Role.STUDENT, "Owner"));
+        UserAccount member = account(Role.STUDENT, "Already Here");
+        String projectId = createdProject(ownerToken, "Duplicate Member Project");
+        String invitationId = invitationFor(ownerToken, projectId, member);
+        mockMvc.perform(post("/api/v1/invitations/" + invitationId + "/accept").header(AUTHORIZATION, tokenFor(member)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post(PROJECTS + "/" + projectId + "/invitations")
+                        .header(AUTHORIZATION, ownerToken)
+                        .contentType("application/json")
+                        .content("{\"inviteeEmail\":\"" + member.getEmail() + "\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("DUPLICATE"));
+    }
+
+    @Test
+    void teamSeatsAreCheckedWhenInvitationsAreAccepted() throws Exception {
+        String ownerToken = tokenFor(account(Role.STUDENT, "Owner"));
+        String projectId = createdProject(ownerToken, "Seat Race Project");
+        String[] invitationIds = new String[5];
+        UserAccount[] invitees = new UserAccount[5];
+        for (int i = 0; i < 5; i++) {
+            invitees[i] = account(Role.STUDENT, "Seat " + i);
+            invitationIds[i] = invitationFor(ownerToken, projectId, invitees[i]);
+        }
+
+        for (int i = 0; i < 4; i++) {
+            mockMvc.perform(post("/api/v1/invitations/" + invitationIds[i] + "/accept")
+                            .header(AUTHORIZATION, tokenFor(invitees[i])))
+                    .andExpect(status().isOk());
+        }
+
+        String lastToken = tokenFor(invitees[4]);
+        mockMvc.perform(post("/api/v1/invitations/" + invitationIds[4] + "/accept").header(AUTHORIZATION, lastToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("TEAM_FULL"));
+
+        mockMvc.perform(get(MINE).header(AUTHORIZATION, lastToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].status").value("PENDING"));
+    }
+
+    @Test
+    void removedMemberCanBeInvitedAgainAndOldInvitationStaysAnswered() throws Exception {
+        String ownerToken = tokenFor(account(Role.STUDENT, "Owner"));
+        UserAccount member = account(Role.STUDENT, "Returning");
+        String memberToken = tokenFor(member);
+        String projectId = createdProject(ownerToken, "Return Project");
+        String oldInvitationId = invitationFor(ownerToken, projectId, member);
+        mockMvc.perform(post("/api/v1/invitations/" + oldInvitationId + "/accept").header(AUTHORIZATION, memberToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(delete(PROJECTS + "/" + projectId + "/members/" + member.getId())
+                        .header(AUTHORIZATION, ownerToken))
+                .andExpect(status().isNoContent());
+
+        String newInvitationId = invitationFor(ownerToken, projectId, member);
+
+        mockMvc.perform(post("/api/v1/invitations/" + oldInvitationId + "/accept").header(AUTHORIZATION, memberToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_TRANSITION"));
+        mockMvc.perform(post("/api/v1/invitations/" + newInvitationId + "/accept").header(AUTHORIZATION, memberToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(get(PROJECTS + "/" + projectId).header(AUTHORIZATION, memberToken))
+                .andExpect(status().isOk());
+    }
+
+    /** Moves the deadline into the past. The lifecycle has no clock hook in tests, so the row is backdated. */
+    private void expireInvitation(String invitationId) {
+        jdbc.update("update project_invitations set expires_at = ? where id = ?",
+                Timestamp.from(Instant.now().minus(Duration.ofDays(1))), uuidBytes(UUID.fromString(invitationId)));
+    }
+
+    private static byte[] uuidBytes(UUID id) {
+        return ByteBuffer.allocate(16).putLong(id.getMostSignificantBits()).putLong(id.getLeastSignificantBits()).array();
     }
 }
