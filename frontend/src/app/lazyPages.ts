@@ -10,3 +10,5 @@ export const ProjectFormPage = lazy(() => import('../features/projects/ProjectFo
 export const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage'))
 export const SkillsPage = lazy(() => import('../features/skills/SkillsPage'))
 export const CertificationsPage = lazy(() => import('../features/certifications/CertificationsPage'))
+export const InvitationsPage = lazy(() => import('../features/invitations/InvitationsPage'))
+export const CalendarPage = lazy(() => import('../features/calendar/CalendarPage'))

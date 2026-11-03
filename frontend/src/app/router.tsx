@@ -4,9 +4,11 @@ import { AppShell } from '../components/AppShell'
 import { PageLoading } from '../components/ui'
 import { RequireAuth } from '../features/auth/RequireAuth'
 import {
+  CalendarPage,
   CertificationsPage,
   ChangePasswordPage,
   DashboardPage,
+  InvitationsPage,
   LoginPage,
   ProjectDetailPage,
   ProjectFormPage,
@@ -37,6 +39,8 @@ export const router = createBrowserRouter([
       { path: 'projects/:projectId/edit', element: lazyPage(<ProjectFormPage />) },
       { path: 'skills', element: lazyPage(<SkillsPage />) },
       { path: 'certifications', element: lazyPage(<CertificationsPage />) },
+      { path: 'invitations', element: lazyPage(<InvitationsPage />) },
+      { path: 'calendar', element: lazyPage(<CalendarPage />) },
       { path: '*', element: <Navigate to="/projects" replace /> },
     ],
   },

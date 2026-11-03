@@ -7,6 +7,7 @@ import { SubmissionPanel } from '../submissions/SubmissionPanel'
 import { TaskPanel } from '../tasks/TaskPanel'
 import { ProjectAdminPanel } from './ProjectAdminPanel'
 import { useGetProjectQuery } from './projectsApi'
+import { TeamPanel } from './TeamPanel'
 
 export default function ProjectDetailPage() {
   const { projectId = '' } = useParams()
@@ -76,6 +77,7 @@ export default function ProjectDetailPage() {
       )}
 
       <TaskPanel project={project} isOwner={isOwner} />
+      <TeamPanel project={project} isOwner={isOwner} />
       <SubmissionPanel project={project} isOwner={isOwner} isSupervisor={isSupervisor} />
       {user?.role === 'ADMIN' && <ProjectAdminPanel project={project} onReload={() => void refetch()} />}
     </article>

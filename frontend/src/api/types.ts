@@ -117,3 +117,37 @@ export interface Certification {
   createdAt: string
   version: number
 }
+
+export interface Member {
+  userId: string
+  displayName?: string
+  role: 'OWNER' | 'MEMBER'
+  joinedAt?: string
+}
+
+export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED'
+
+export interface Invitation {
+  id: string
+  projectId: string
+  projectTitle?: string
+  invitee?: PersonSummary
+  inviter?: PersonSummary
+  status: InvitationStatus
+  expiresAt: string
+  createdAt: string
+  respondedAt?: string
+  version: number
+}
+
+export type CalendarEntryType = 'TASK_DUE' | 'PROJECT_DUE'
+
+export interface CalendarEntry {
+  type: CalendarEntryType
+  date: string
+  id: string
+  title: string
+  status: string
+  projectId: string
+  projectTitle: string
+}
