@@ -10,11 +10,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class IdentityMaintenanceJobs {
 
     private final RevokedTokenRepository revokedTokens;
+    private final RefreshSessionRepository refreshSessions;
     private final UserAccountRepository users;
     private final Clock clock;
 
-    public IdentityMaintenanceJobs(RevokedTokenRepository revokedTokens, UserAccountRepository users, Clock clock) {
+    public IdentityMaintenanceJobs(RevokedTokenRepository revokedTokens, RefreshSessionRepository refreshSessions,
+                                   UserAccountRepository users, Clock clock) {
         this.revokedTokens = revokedTokens;
+        this.refreshSessions = refreshSessions;
         this.users = users;
         this.clock = clock;
     }
@@ -24,6 +27,13 @@ public class IdentityMaintenanceJobs {
     @Transactional
     public void purgeExpiredRevokedTokens() {
         revokedTokens.deleteExpired(clock.instant());
+    }
+
+    /** Drops refresh sessions past their absolute end (ADR-025). */
+    @Scheduled(cron = "0 15 * * * *", zone = "UTC")
+    @Transactional
+    public void purgeExpiredRefreshSessions() {
+        refreshSessions.deleteExpired(clock.instant());
     }
 
     /** Clears lockout windows that have ended. */

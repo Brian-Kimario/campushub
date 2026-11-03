@@ -46,7 +46,7 @@ For private resources the response to a caller without access is 404 `NOT_FOUND`
 | Method | Path | Auth | Purpose | Success | Errors |
 |---|---|---|---|---|---|
 | POST | `/auth/login` | public | Sign in | 200 `{accessToken, tokenType:"Bearer", expiresIn:900, user}` | 400 `VALIDATION_FAILED`; 401 `INVALID_CREDENTIALS` (also used for locked accounts, see SECURITY §3); 429 `RATE_LIMITED` |
-| POST | `/auth/logout` | any valid token | Revoke current token | 204 | 401 |
+| POST | `/auth/logout` | any token, or none | Revoke the current access token and the refresh family, clear the cookie. Works with an expired access token. Requires `X-Requested-With: CampusHub` | 204 | 400 without the header |
 | GET | `/auth/me` | any valid token | Current user summary | 200 `user` | 401; 403 `PASSWORD_CHANGE_REQUIRED` is not returned here |
 | POST | `/auth/change-password` | any valid token | Change own password | 204 | 400 `VALIDATION_FAILED`; 401 `INVALID_CREDENTIALS` (current password wrong) |
 
@@ -56,7 +56,7 @@ Password policy: at least 8 characters and at most 72 UTF-8 bytes (the BCrypt in
 
 Gate: while `mustChangePassword` is true, every endpoint except `/auth/me`, `/auth/logout`, and `/auth/change-password` returns 403 `PASSWORD_CHANGE_REQUIRED`.
 
-Refresh tokens are deferred (ADR-004); no `/auth/refresh` endpoint exists in MVP.
+Refresh sessions (ADR-025, supersedes ADR-004): `POST /auth/login` also sets the `campushub_refresh` cookie (HttpOnly, SameSite=Strict, Path=/api/v1/auth, Secure by default, 8-hour absolute lifetime). `POST /auth/refresh` requires `X-Requested-With: CampusHub`, rotates the cookie, and returns a new access token. A missing or unknown cookie gives 401 `UNAUTHENTICATED`. Reusing a rotated token revokes its whole family. `POST /auth/change-password` clears the cookie and revokes every refresh family for the user.
 
 ## 3. Error model
 

@@ -15,9 +15,10 @@ export function AppShell() {
       await logout().unwrap()
     } catch {
       // The local session ends either way, so a failed call to the server is not shown to the user.
+    } finally {
+      dispatch(baseApi.util.resetApiState())
+      dispatch(sessionCleared())
     }
-    dispatch(baseApi.util.resetApiState())
-    dispatch(sessionCleared())
   }
 
   return (

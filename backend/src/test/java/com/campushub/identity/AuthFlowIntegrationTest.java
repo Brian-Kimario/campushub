@@ -1,6 +1,7 @@
 package com.campushub.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -15,6 +16,7 @@ import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import jakarta.servlet.http.Cookie;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -32,6 +34,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.testcontainers.containers.MySQLContainer;
@@ -57,6 +60,9 @@ class AuthFlowIntegrationTest {
     private static final String JWT_SECRET = "integration-test-secret-of-more-than-32-bytes";
     private static final String DEV_SEED_PASSWORD = "dev-seed-password-123";
     private static final String PASSWORD = "correct-horse-battery";
+    private static final String REFRESH_COOKIE = "campushub_refresh";
+    private static final String CLIENT_HEADER = "X-Requested-With";
+    private static final String CLIENT_VALUE = "CampusHub";
 
     @Container
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>(MYSQL_IMAGE).withDatabaseName("campushub");
@@ -194,7 +200,8 @@ class AuthFlowIntegrationTest {
         UserAccount account = account(Role.STUDENT, false);
         String token = tokenFor(account);
 
-        mockMvc.perform(post("/api/v1/auth/logout").header("Authorization", bearer(token)))
+        mockMvc.perform(post("/api/v1/auth/logout").header("Authorization", bearer(token))
+                        .header(CLIENT_HEADER, CLIENT_VALUE))
                 .andExpect(status().isNoContent());
         mockMvc.perform(get("/api/v1/auth/me").header("Authorization", bearer(token)))
                 .andExpect(status().isUnauthorized());
@@ -321,5 +328,95 @@ class AuthFlowIntegrationTest {
             assertThat(users.findByEmail(email)).hasValueSatisfying(account ->
                     assertThat(account.isMustChangePassword()).isFalse());
         }
+    }
+
+    private MvcResult loginResult(UserAccount account) throws Exception {
+        return login(account.getEmail(), PASSWORD).andExpect(status().isOk()).andReturn();
+    }
+
+    private static Cookie refreshCookie(MvcResult result) {
+        Cookie cookie = result.getResponse().getCookie(REFRESH_COOKIE);
+        assertThat(cookie).as("refresh cookie").isNotNull();
+        return cookie;
+    }
+
+    private ResultActions refresh(Cookie cookie) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/refresh").with(fromNewAddress())
+                .cookie(cookie).header(CLIENT_HEADER, CLIENT_VALUE));
+    }
+
+    @Test
+    void loginSetsAnHttpOnlyRefreshCookieScopedToTheAuthPath() throws Exception {
+        MvcResult result = loginResult(account(Role.STUDENT, false));
+
+        Cookie cookie = refreshCookie(result);
+        assertThat(cookie.isHttpOnly()).isTrue();
+        assertThat(cookie.getPath()).isEqualTo("/api/v1/auth");
+        assertThat(result.getResponse().getHeader("Set-Cookie")).contains("SameSite=Strict");
+    }
+
+    @Test
+    void refreshRotatesTheCookieAndReturnsAUsableAccessToken() throws Exception {
+        UserAccount account = account(Role.STUDENT, false);
+        Cookie first = refreshCookie(loginResult(account));
+
+        MvcResult rotated = refresh(first).andExpect(status().isOk()).andReturn();
+        Cookie second = refreshCookie(rotated);
+        String access = rotated.getResponse().getContentAsString()
+                .replaceAll("(?s).*\"accessToken\":\"([^\"]+)\".*", "$1");
+
+        assertThat(second.getValue()).isNotEqualTo(first.getValue());
+        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", bearer(access)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void reusingARotatedRefreshTokenRevokesTheWholeFamily() throws Exception {
+        UserAccount account = account(Role.STUDENT, false);
+        Cookie first = refreshCookie(loginResult(account));
+        Cookie second = refreshCookie(refresh(first).andExpect(status().isOk()).andReturn());
+
+        refresh(first).andExpect(status().isUnauthorized());
+        refresh(second).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void refreshWithoutTheClientHeaderIsRejected() throws Exception {
+        Cookie cookie = refreshCookie(loginResult(account(Role.STUDENT, false)));
+
+        mockMvc.perform(post("/api/v1/auth/refresh").with(fromNewAddress()).cookie(cookie))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void refreshWithoutACookieIsUnauthenticated() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh").with(fromNewAddress())
+                        .header(CLIENT_HEADER, CLIENT_VALUE))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void logoutEndsTheSessionEvenWhenTheAccessTokenIsExpired() throws Exception {
+        Cookie cookie = refreshCookie(loginResult(account(Role.STUDENT, false)));
+
+        mockMvc.perform(post("/api/v1/auth/logout").header(CLIENT_HEADER, CLIENT_VALUE)
+                        .header("Authorization", bearer("not-a-valid-token")).cookie(cookie))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("Set-Cookie", containsString("Max-Age=0")));
+        refresh(cookie).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void changePasswordEndsEveryRefreshSession() throws Exception {
+        UserAccount account = account(Role.STUDENT, false);
+        Cookie cookie = refreshCookie(loginResult(account));
+        String token = tokenFor(account);
+
+        mockMvc.perform(post("/api/v1/auth/change-password").header("Authorization", bearer(token))
+                        .contentType("application/json")
+                        .content("{\"currentPassword\":\"" + PASSWORD + "\",\"newPassword\":\"another-new-passphrase\"}"))
+                .andExpect(status().isNoContent());
+
+        refresh(cookie).andExpect(status().isUnauthorized());
     }
 }

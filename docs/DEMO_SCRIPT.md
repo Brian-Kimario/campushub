@@ -58,7 +58,7 @@ The seeder creates one account per role. Names only; the password is the value y
 
 The seeder skips accounts that already exist, so changing `CAMPUSHUB_DEV_SEED_PASSWORD` later does not change a password that is already stored. To reset a demo password, use the admin account's user management, or reset the local database (see §5).
 
-Use one browser profile for one role at a time, or use a private window per role. The access token is held in memory only, so reloading the page ends the session. Sign in again after a reload.
+Use one browser profile for one role at a time, or use a private window per role. The access token is held in memory only. A reload restores the session from the HttpOnly refresh cookie (ADR-025). Signing out ends the session on the server and clears the cookie.
 
 ## 3. Script
 
@@ -142,13 +142,13 @@ What was checked, and how. Anything not listed as verified was not demonstrated 
 
 | Area | Status | Evidence |
 |---|---|---|
-| `/api/v1` routing and auth | Verified | `./mvnw -B verify`, 89 tests, 0 failures |
+| `/api/v1` routing and auth | Verified | `./mvnw -B verify`, 97 tests, 0 failures |
 | Login (correct and wrong password), empty-field validation, `/projects` redirect without session | Verified in browser | Built-in browser pane |
 | Student project create, task create, transition to `IN_PROGRESS`, revision 1 and 2 submit | Verified in browser | Built-in browser pane |
 | Admin supervisor assignment | Verified in browser | Built-in browser pane |
 | Faculty review start, changes requested with feedback, student sees feedback | Verified in browser | Built-in browser pane |
 | Password change through the UI (old rejected, new accepted) | Verified in browser | Built-in browser pane; original password restored afterwards |
-| Session end on reload | Verified in browser | Redirects to login, as designed (ADR-004) |
+| Session restored on reload; sign-out ends it | Verified in browser | Reload stays on `/projects` (refresh returns 200). Sign-out returns 204 on the first click, lands on `/login`, and the next visit to `/projects` redirects to login (refresh returns 401) |
 | Faculty accepts revision 2 and the student sees the accepted decision | Not verified in browser | Backend decision rules covered by `SubmissionFlowIntegrationTest` |
 | Student attempts admin actions and cross-user access in the UI | Not verified in browser | Covered by backend tests only |
 | Task transitions beyond `IN_PROGRESS` (`BLOCKED`, `DONE`, archive) | Not verified in browser | Covered by backend tests (`TaskFlowIntegrationTest`) |
@@ -164,7 +164,7 @@ What was checked, and how. Anything not listed as verified was not demonstrated 
 | Login returns 401 for every account | The seed password does not match. Check `CAMPUSHUB_DEV_SEED_PASSWORD` in `.env`, or reset the demo password through admin user management. |
 | Readiness is `DOWN` | Check `docker compose logs api`. A missing storage path causes a `DOWN` status locally; the Compose volume provides `/var/campushub/storage`. |
 | Frontend calls fail with a network error | The API is not running on the port the proxy targets. Set `CAMPUSHUB_API_TARGET` before `npm run dev` if the API is on another port. |
-| Page reload shows the login screen | Expected. The access token is in memory only (ADR-004). Sign in again. |
+| Page reload shows the login screen | The refresh cookie is missing or expired (8-hour limit). Sign in again. If the browser refuses the Secure cookie over plain HTTP, set `campushub.refresh.cookie-secure=false` for that local run only. |
 | Startup refuses the seed | `CAMPUSHUB_DEV_SEED_ENABLED=true` requires `CAMPUSHUB_DEV_SEED_PASSWORD` to be set. |
 
 Reset the local database only if you accept losing its data. The command below removes the volumes and is not part of the normal demo:
@@ -178,5 +178,5 @@ docker compose down -v
 - The MVP has no file upload, calendar, invitations, milestones, audit log UI, or account deactivation UI. These are out of MVP scope.
 - The task list returns at most 50 tasks per project, and the UI has no pagination controls.
 - The break-glass path for administrators to read a private submission is deferred (ADR-007), so the admin account cannot open a student's submission files.
-- Sign-out sometimes needs a second attempt in the built-in browser pane. It was observed during verification and is not yet investigated.
+- The intermittent sign-out failure seen earlier (needing a second click) did not recur in the final browser check, but it was not stress-tested. The refresh-cookie fix addresses its likely cause (an expired access token blocking `/auth/logout`), which is covered by a backend test.
 - The compose API port (8080) must not be used by another process during the demo.

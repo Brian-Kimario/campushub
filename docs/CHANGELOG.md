@@ -7,6 +7,28 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [Phase 5A session restore] — 2026-11-03 — Refresh-cookie sessions and reliable sign-out
+
+**Status:** Complete locally. Not pushed.
+
+**Affected documents:** `docs/DECISIONS.md` (ADR-025 added; ADR-004 superseded), `docs/API_CONTRACT.md` (§2 logout and refresh), `docs/SECURITY.md` (refresh tokens, CSRF, risk note), `docs/ARCHITECTURE.md` (decision index), `docs/DEMO_SCRIPT.md` (reload and sign-out rows, troubleshooting, known limitations), `docs/DATA_MODEL.md` (V7 table), `docs/CHANGELOG.md` (this entry).
+
+**Changed (code):**
+- Flyway V7 creates `refresh_sessions` (hash of the token, family, user, expiry, used and revoked timestamps).
+- Login sets an HttpOnly, SameSite=Strict, Secure-by-default cookie scoped to `/api/v1/auth`. `POST /auth/refresh` rotates it and returns a new access token. Reuse of a rotated token revokes the family and writes `auth.refresh_reuse_detected` to the audit log.
+- `POST /auth/logout` works with an expired access token, revokes the refresh family, and clears the cookie. Both cookie endpoints require `X-Requested-With: CampusHub`.
+- `AuthenticationFilter` no longer returns 401 for a bad bearer token on `/auth/refresh` and `/auth/logout`.
+- Password change revokes every refresh family for the user.
+- Hourly job purges expired refresh rows.
+- Frontend restores the session once per page load (`SessionGate`, single-flight refresh), retries one request after an expired access token, and clears local state in a `finally` on sign-out.
+
+**Verified:**
+- `./mvnw -B verify`: 97 tests, 0 failures, including 7 new refresh-cookie cases in `AuthFlowIntegrationTest`.
+- `npm run build` and `npm run lint` (exit 0).
+- Built-in browser: sign-in, reload keeps the session, sign-out returns 204 and lands on `/login`, and `/projects` after sign-out redirects to login.
+
+**Not verified:** reuse detection, a deactivated account's refresh, and logout with an expired token in the browser (backend tests cover the first and third; the deactivated-account case is implemented but has no test yet). GitHub Actions has not run on these commits.
+
 ## [MVP password minimum] — 2026-11-03 — Minimum lowered to 8 characters
 
 **Status:** Complete locally. Not pushed.

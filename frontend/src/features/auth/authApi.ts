@@ -1,4 +1,5 @@
 import { baseApi } from '../../api/baseApi'
+import { CLIENT_HEADER_NAME, CLIENT_HEADER_VALUE } from '../../api/apiConfig'
 import type { LoginResponse } from '../../api/types'
 
 export interface LoginRequest {
@@ -18,7 +19,7 @@ export const authApi = baseApi.injectEndpoints({
       query: (body) => ({ url: '/auth/login', method: 'POST', body }),
     }),
     logout: builder.mutation<void, void>({
-      query: () => ({ url: '/auth/logout', method: 'POST' }),
+      query: () => ({ url: '/auth/logout', method: 'POST', headers: { [CLIENT_HEADER_NAME]: CLIENT_HEADER_VALUE } }),
     }),
     changePassword: builder.mutation<void, ChangePasswordRequest>({
       query: (body) => ({ url: '/auth/change-password', method: 'POST', body }),

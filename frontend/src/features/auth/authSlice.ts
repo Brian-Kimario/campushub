@@ -4,11 +4,13 @@ import type { UserSummary } from '../../api/types'
 export interface AuthState {
   accessToken: string | null
   user: UserSummary | null
+  // False until the first restore attempt after a page load finishes (see SessionGate).
+  initialized: boolean
 }
 
-const initialState: AuthState = { accessToken: null, user: null }
+const initialState: AuthState = { accessToken: null, user: null, initialized: false }
 
-// The token stays in memory only. A reload ends the session (ADR-004: no refresh tokens in the MVP).
+// The access token stays in memory only. A reload restores the session from the HttpOnly refresh cookie (ADR-025).
 const authSlice = createSlice({
   name: 'auth',
   initialState,
@@ -17,14 +19,18 @@ const authSlice = createSlice({
       state.accessToken = action.payload.accessToken
       state.user = action.payload.user
     },
+    sessionChecked(state) {
+      state.initialized = true
+    },
     userUpdated(state, action: PayloadAction<UserSummary>) {
       state.user = action.payload
     },
-    sessionCleared() {
-      return initialState
+    sessionCleared(state) {
+      state.accessToken = null
+      state.user = null
     },
   },
 })
 
-export const { sessionStarted, userUpdated, sessionCleared } = authSlice.actions
+export const { sessionStarted, sessionChecked, userUpdated, sessionCleared } = authSlice.actions
 export const authReducer = authSlice.reducer

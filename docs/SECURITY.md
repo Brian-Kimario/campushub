@@ -39,7 +39,7 @@ Actors: anonymous internet user; authenticated student, faculty, or administrato
 | Signing key | At least 64 random bytes from the environment; the application refuses to start with a placeholder value or a key shorter than 32 bytes | Startup test |
 | Revocation | Logout inserts `jti` into `revoked_tokens`. Password reset and admin deactivation revoke all tokens for the user by recording a `revoked_after` timestamp on `users` (added to V3) | NS-08 test and logout test |
 | Per-request status check | Each request re-reads the user's `status` and `must_change_password` | NS-08 test |
-| Refresh tokens | Deferred (ADR-004). Planned P1 design: HttpOnly, Secure, SameSite=Strict cookie scoped to `/api/v1/auth`, rotation with reuse detection | Phase 2 gate documents the design; implementation in P1 |
+| Refresh tokens | Implemented (ADR-025, supersedes ADR-004). Opaque 32-byte token, SHA-256 hash stored in `refresh_sessions`, HttpOnly, Secure by default, SameSite=Strict cookie scoped to `/api/v1/auth`, rotation with family revocation on reuse, 8-hour absolute lifetime | `AuthFlowIntegrationTest` refresh cases |
 | Session in browser | Access token kept in memory (Redux `auth` slice). `sessionStorage` holds drafts only, never the token | Frontend unit test that asserts the token key is absent from storage |
 
 ## 4. Authorization
@@ -88,7 +88,7 @@ Traversal tests (NS-07) include `../`, absolute paths, encoded separators, NUL b
 | `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'` |
 | Other headers | `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY`, `Permissions-Policy` denying camera, microphone, geolocation |
 | CORS | Exact origins from configuration (`CAMPUSHUB_CORS_ALLOWED_ORIGINS`, default `http://localhost:5173`). No wildcard with credentials. Allowed headers: `Authorization`, `Content-Type`, `X-Request-Id` |
-| CSRF | Not applicable to bearer-token APIs without cookies. If the P1 refresh cookie ships, the refresh endpoint requires SameSite=Strict plus a double-submit header |
+| CSRF | Bearer-token APIs are not exposed to CSRF. The refresh cookie is SameSite=Strict and the cookie endpoints (`/auth/refresh`, `/auth/logout`) require the `X-Requested-With: CampusHub` header |
 
 Tests assert each header on a representative endpoint and CORS behavior for a disallowed origin.
 
@@ -150,7 +150,7 @@ Application logs: structured JSON, one line per event, with `requestId`. Never l
 
 ## 13. Known limitations (accepted for MVP)
 
-Recorded in [RISKS.md](RISKS.md): no malware scanning (R-07), no refresh tokens (ADR-004), single-node rate limiting (R-09), no break-glass access (ADR-007), no MFA (R-10). Each has a planned P1 or P2 mitigation or an explicit owner acceptance requirement.
+Recorded in [RISKS.md](RISKS.md): no malware scanning (R-07), single-node rate limiting (R-09), no break-glass access (ADR-007), no MFA (R-10). Each has a planned P1 or P2 mitigation or an explicit owner acceptance requirement.
 
 ## 14. Incident response (minimal)
 
