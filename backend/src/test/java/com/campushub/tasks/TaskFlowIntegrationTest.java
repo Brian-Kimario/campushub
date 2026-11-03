@@ -1,6 +1,8 @@
 package com.campushub.tasks;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -372,6 +374,88 @@ class TaskFlowIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("TODO"))
                 .andExpect(jsonPath("$.version").value(0));
+    }
+
+    /** Invites the student and accepts on their behalf, so they are a team member when this returns. */
+    private void acceptedMember(String ownerToken, String projectId, UserAccount invitee) throws Exception {
+        String body = mockMvc.perform(post("/api/v1/projects/" + projectId + "/invitations")
+                        .header(AUTHORIZATION, bearer(ownerToken))
+                        .contentType("application/json")
+                        .content("{\"inviteeEmail\":\"" + invitee.getEmail() + "\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String invitationId = JsonPath.read(body, "$.id");
+        mockMvc.perform(post("/api/v1/invitations/" + invitationId + "/accept")
+                        .header(AUTHORIZATION, bearer(tokenFor(invitee))))
+                .andExpect(status().isOk());
+    }
+
+    /** Full-field PATCH that sets the assignee; a null assignee unassigns. */
+    private ResultActions assign(String token, String taskId, int version, String title, UUID assigneeId)
+            throws Exception {
+        String assignee = assigneeId == null ? "null" : "\"" + assigneeId + "\"";
+        return mockMvc.perform(patch("/api/v1/tasks/" + taskId).header(AUTHORIZATION, bearer(token))
+                .contentType("application/json")
+                .content("{\"version\":" + version + ",\"title\":\"" + title + "\",\"assigneeId\":" + assignee + "}"));
+    }
+
+    @Test
+    void assigneeMustBeTheOwnerOrAnActiveMemberAndNullUnassigns() throws Exception {
+        UserAccount owner = account(Role.STUDENT, "Owner");
+        String ownerToken = tokenFor(owner);
+        String projectId = createdProject(ownerToken);
+        UserAccount member = account(Role.STUDENT, "Member");
+        acceptedMember(ownerToken, projectId, member);
+        UserAccount outsider = account(Role.STUDENT, "Outsider");
+
+        createTask(ownerToken, projectId, "{\"title\":\"Given at birth\",\"assigneeId\":\"" + member.getId() + "\"}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.assigneeId").value(member.getId().toString()));
+        createTask(ownerToken, projectId, "{\"title\":\"Not on the team\",\"assigneeId\":\"" + outsider.getId() + "\"}")
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("PRECONDITION_NOT_MET"));
+
+        String taskId = createdTask(ownerToken, projectId, "Assigned later");
+        assign(ownerToken, taskId, 0, "Assigned later", outsider.getId())
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("PRECONDITION_NOT_MET"));
+        assign(ownerToken, taskId, 0, "Assigned later", owner.getId())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assigneeId").value(owner.getId().toString()));
+        assign(ownerToken, taskId, 1, "Assigned later", null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assigneeId").value(nullValue()));
+    }
+
+    @Test
+    void removingAMemberClearsOnlyTheirOpenAssignments() throws Exception {
+        UserAccount owner = account(Role.STUDENT, "Owner");
+        String ownerToken = tokenFor(owner);
+        String projectId = createdProject(ownerToken);
+        UserAccount member = account(Role.STUDENT, "Member");
+        acceptedMember(ownerToken, projectId, member);
+
+        String openTaskId = createdTask(ownerToken, projectId, "Still open");
+        assign(ownerToken, openTaskId, 0, "Still open", member.getId()).andExpect(status().isOk());
+
+        String doneTaskId = createdTask(ownerToken, projectId, "Already finished");
+        assign(ownerToken, doneTaskId, 0, "Already finished", member.getId()).andExpect(status().isOk());
+        transition(ownerToken, doneTaskId, "IN_PROGRESS", 1).andExpect(status().isOk());
+        transition(ownerToken, doneTaskId, "IN_REVIEW", 2).andExpect(status().isOk());
+        transition(ownerToken, doneTaskId, "DONE", 3).andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/v1/projects/" + projectId + "/members/" + member.getId())
+                        .header(AUTHORIZATION, bearer(ownerToken)))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/tasks/" + openTaskId).header(AUTHORIZATION, bearer(ownerToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assigneeId").value(nullValue()))
+                .andExpect(jsonPath("$.version").value(2));
+        mockMvc.perform(get("/api/v1/tasks/" + doneTaskId).header(AUTHORIZATION, bearer(ownerToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assigneeId").value(member.getId().toString()))
+                .andExpect(jsonPath("$.version").value(4));
     }
 
     /** Admin request that assigns a supervisor to a project still at version 0. */

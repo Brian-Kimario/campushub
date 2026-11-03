@@ -154,6 +154,11 @@ public class ProjectService {
         return project.isOwnedBy(caller.userId()) || isMember(caller, project);
     }
 
+    /** Whether the user is the owner or a current team member. Used to validate task assignees (FR-TASK-02). */
+    public boolean isTeamParticipant(Project project, UUID userId) {
+        return project.isOwnedBy(userId) || members.existsByProjectIdAndUserId(project.getId(), userId);
+    }
+
     /** Whether the caller may see the project. Calendar and list views filter with this too. */
     public boolean canSee(AuthenticatedUser caller, Project project) {
         return switch (caller.role()) {

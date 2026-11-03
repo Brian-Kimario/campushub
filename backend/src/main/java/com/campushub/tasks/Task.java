@@ -41,6 +41,9 @@ public class Task {
     private Instant completedAt;
 
     @JdbcTypeCode(SqlTypes.BINARY)
+    private UUID assigneeId;
+
+    @JdbcTypeCode(SqlTypes.BINARY)
     private UUID createdBy;
 
     private Instant createdAt;
@@ -70,6 +73,12 @@ public class Task {
         this.description = description;
         this.priority = priority;
         this.dueDate = dueDate;
+        this.updatedAt = now;
+    }
+
+    /** Sets or clears the assignee. The caller has already checked that the assignee is on the team. */
+    public void assignTo(UUID assigneeId, Instant now) {
+        this.assigneeId = assigneeId;
         this.updatedAt = now;
     }
 
@@ -115,6 +124,10 @@ public class Task {
 
     public Instant getCompletedAt() {
         return completedAt;
+    }
+
+    public UUID getAssigneeId() {
+        return assigneeId;
     }
 
     public UUID getCreatedBy() {

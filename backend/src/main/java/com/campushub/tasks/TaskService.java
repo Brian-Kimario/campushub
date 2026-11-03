@@ -64,9 +64,11 @@ public class TaskService {
         Project project = projects.visibleProject(caller, projectId);
         requireTeamWriter(caller, project);
         ProjectService.requireNotArchived(project);
+        requireAssignable(project, body.assigneeId());
         TaskPriority priority = body.priority() == null ? TaskPriority.MEDIUM : body.priority();
         Task task = new Task(UUID.randomUUID(), projectId, caller.userId(), body.title(), body.description(),
                 priority, body.dueDate(), clock.instant());
+        task.assignTo(body.assigneeId(), clock.instant());
         tasks.save(task);
         audit.record("task.created", caller.userId(), TASK, task.getId().toString(),
                 AuditOutcome.SUCCESS, request, Map.of());
@@ -84,8 +86,10 @@ public class TaskService {
                     "Status changes go through POST /tasks/{id}/transitions.");
         }
         requireVersion(task, body.version());
+        requireAssignable(project, body.assigneeId());
         TaskPriority priority = body.priority() == null ? TaskPriority.MEDIUM : body.priority();
         task.updateDetails(body.title(), body.description(), priority, body.dueDate(), clock.instant());
+        task.assignTo(body.assigneeId(), clock.instant());
         tasks.saveAndFlush(task);
         audit.record("task.updated", caller.userId(), TASK, id.toString(), AuditOutcome.SUCCESS, request, Map.of());
         return toResponse(task);
@@ -129,6 +133,14 @@ public class TaskService {
         }
     }
 
+    /** An assignee must be the owner or a current member (422). A null assignee means unassigned. */
+    private void requireAssignable(Project project, UUID assigneeId) {
+        if (assigneeId != null && !projects.isTeamParticipant(project, assigneeId)) {
+            throw new ApiException(ErrorCode.PRECONDITION_NOT_MET,
+                    "The assignee must be the project owner or an active team member.");
+        }
+    }
+
     private static void requireVersion(Task task, Integer expectedVersion) {
         if (!Objects.equals(task.getVersion(), expectedVersion)) {
             throw new ApiException(ErrorCode.STALE_VERSION, "The task changed since it was read. Reload and try again.");
@@ -138,7 +150,8 @@ public class TaskService {
     private static TaskResponse toResponse(Task task) {
         return new TaskResponse(task.getId(), task.getProjectId(), task.getTitle(), task.getDescription(),
                 task.getStatus(), task.getPriority(), task.getBlockedReason(), task.getDueDate(),
-                task.getCompletedAt(), task.getCreatedBy(), task.getVersion(), task.getCreatedAt(),
+                task.getCompletedAt(), task.getCreatedBy(), task.getAssigneeId(), task.getVersion(),
+                task.getCreatedAt(),
                 task.getUpdatedAt());
     }
 

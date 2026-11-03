@@ -13,6 +13,8 @@ import com.campushub.shared.errors.ApiException;
 import com.campushub.shared.errors.ErrorCode;
 import com.campushub.shared.web.PageResponse;
 import com.campushub.shared.web.Pagination;
+import com.campushub.tasks.TaskRepository;
+import com.campushub.tasks.TaskStatus;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.time.Duration;
@@ -53,17 +55,19 @@ public class MembershipService {
     private final ProjectMemberRepository members;
     private final ProjectInvitationRepository invitations;
     private final UserAccountRepository users;
+    private final TaskRepository tasks;
     private final AuditService audit;
     private final Clock clock;
 
     public MembershipService(ProjectService projectService, ProjectRepository projects,
                              ProjectMemberRepository members, ProjectInvitationRepository invitations,
-                             UserAccountRepository users, AuditService audit, Clock clock) {
+                             UserAccountRepository users, TaskRepository tasks, AuditService audit, Clock clock) {
         this.projectService = projectService;
         this.projects = projects;
         this.members = members;
         this.invitations = invitations;
         this.users = users;
+        this.tasks = tasks;
         this.audit = audit;
         this.clock = clock;
     }
@@ -97,6 +101,7 @@ public class MembershipService {
             throw new ApiException(ErrorCode.NOT_FOUND, "No team member was found.");
         }
         members.deleteByProjectIdAndUserId(locked.getId(), userId);
+        tasks.unassignOpenTasks(locked.getId(), userId, TaskStatus.DONE, clock.instant());
         audit.record(MEMBER_REMOVED, caller.userId(), PROJECT, projectId.toString(), AuditOutcome.SUCCESS,
                 request, Map.of());
     }
