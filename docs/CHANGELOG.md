@@ -7,6 +7,36 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [Phase F] — 2026-11-04 — Database-backed notifications with read state
+
+**Status:** Complete locally. Not pushed. Committed locally at the time of writing.
+
+**Affected documents:** `docs/CHANGELOG.md` (this entry), `docs/MASTER_BLUEPRINT_COMPLIANCE.md` (new NOTIF-01 row, planned order items 6 and 7). Code: `backend/src/main/resources/db/migration/V15__notifications.sql`, `backend/src/main/java/com/campushub/notifications/` (new package), `backend/src/main/java/com/campushub/projects/MembershipService.java`, `backend/src/test/java/com/campushub/notifications/NotificationFlowIntegrationTest.java`, `frontend/src/features/notifications/`, `frontend/src/components/AppShell.tsx`, `frontend/src/app/router.tsx`, `frontend/src/api/types.ts`, `frontend/src/api/baseApi.ts`.
+
+**Changed (code):**
+- V15 adds the `notifications` table: recipient, actor, type (CHECK limited to four types), project, created and read times, and a version column. Foreign keys to users and projects use RESTRICT. Indexes cover the recipient's list and unread lists.
+- `MembershipService` writes a notification in the same transaction as each change: invitation received, invitation accepted, invitation declined, and member removed. A rolled-back change also rolls back its notification.
+- Endpoints: `GET /notifications` (optional `unreadOnly`, paged, newest first), `GET /notifications/unread-count`, `POST /notifications/{id}/read`, and `POST /notifications/read-all`. A notification that belongs to another user returns 404.
+- Frontend: an inbox page at `/notifications` with an unread-only filter, mark as read, and mark all as read. The header shows an unread count that refreshes every 60 seconds.
+
+**Verified:**
+- `./mvnw -B verify`: 180 tests, 0 failures, BUILD SUCCESS (174 before Phase F plus 6 new tests).
+- `NotificationFlowIntegrationTest` (6 tests): the invitation and both answers notify the right people; a failed invitation writes no notification; a removal notifies the member and ends their access at once; mark read is private to the recipient and idempotent; mark all read clears only the caller's unread rows; a faculty user with no team sees an empty inbox.
+- Frontend: `npm run build` and `npm run lint` pass.
+
+**Not verified:**
+- Browser flow for the inbox and the header badge. Build and lint only.
+- Polling behavior over time. The badge refreshes once a minute; this has not been observed in a running session.
+
+**Deferred (documented, not built):**
+- Outbox table and relay (FR-EVT-01, FR-EVT-02), Kafka producer and consumers (FR-EVT-02, FR-EVT-03), and retry and DLQ (FR-EVT-04). All remain Missing. Notifications are written directly to the database, not through an outbox.
+
+**Known gaps and deviations:**
+- Messages are rendered on read from the current project title and actor name. If a project is renamed, old notifications show the new title. Nothing is stored as text.
+- No delete endpoint and no retention rule. Notifications accumulate.
+- No notification for submission review, milestone changes, or task assignment. Only the four membership events above are covered.
+- No push, email, or real-time update. The badge uses polling.
+
 ## [Phase E.4] — 2026-11-03 — Invitation lifecycle tests and stale-invitation fix
 
 **Status:** Complete locally. Not pushed. Committed locally at the time of writing.

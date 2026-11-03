@@ -147,6 +147,7 @@ The earlier summary said the MVP covers "P0 basics". That is only partly accurat
 
 | ID | Requirement | Status | Evidence | Remaining work | Priority |
 |---|---|---|---|---|---|
+| NOTIF-01 | Users see their own notifications with read state | Partial | V15 `notifications` table; `GET /notifications`, `/unread-count`, `POST /{id}/read`, `/read-all`; inbox page at `/notifications`; unread badge in the header | Covers invitation received, accepted, declined, and member removed only. Messages are rendered on read, so a project title change shows in old notifications. No delete. No notification for submission review or other events. Tests: `NotificationFlowIntegrationTest` (6). Browser flow: UNVERIFIED. | P2 |
 | FR-EVT-01 | Events written to `outbox_events` in the same transaction | Missing | No outbox table or code | Outbox migration and writes in the same transaction. | P2 |
 | FR-EVT-02 | Relay publishes to Kafka when enabled | Missing | No Kafka dependency in `pom.xml`; `application.yml` has a placeholder reference only | Relay and producer. | P2 |
 | FR-EVT-03 | Idempotent consumers | Missing | No `processed_events` | Consumer with unique event ID. | P2 |
@@ -179,7 +180,7 @@ The earlier summary said the MVP covers "P0 basics". That is only partly accurat
 3. Submission evidence files (FR-SUB-02 to 05, FR-CERT-02 storage). Done locally for FR-SUB-02 and FR-SUB-03; see CHANGELOG "Phase E.3". FR-CERT-02 and the FR-SUB-04 file rule remain open.
 4. Invitation lifecycle tests (FR-TEAM-01 to 04). Done locally; see CHANGELOG "Phase E.4". Found and fixed a stale-invitation bug. Revoke endpoint still missing (RISKS).
 5. Task pagination in the UI.
-6. Database-backed notifications with read state (not in REQUIREMENTS.md, added for the release brief).
-7. Outbox and Kafka: deferred unless time remains; see the checkpoint report.
+6. Database-backed notifications with read state (not in REQUIREMENTS.md, added for the release brief). Done locally; see CHANGELOG "Phase F". Four membership events write rows in the same transaction. Inbox page, unread count, mark read and mark all read. No outbox, no delete, no push.
+7. Outbox and Kafka: deferred (FR-EVT-01 to 04 remain Missing). Not started in Phase F; see the checkpoint report.
 
 Not in this pass, and documented as remaining gaps: project proposal and approval states, the academic catalog, profile editing, admin user management, admin dashboard, audit log endpoint, activity feed, and the Kafka pipeline.

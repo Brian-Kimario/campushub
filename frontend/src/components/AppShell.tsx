@@ -3,12 +3,15 @@ import { baseApi } from '../api/baseApi'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
 import { sessionCleared } from '../features/auth/authSlice'
 import { useLogoutMutation } from '../features/auth/authApi'
+import { useUnreadNotificationCountQuery } from '../features/notifications/notificationsApi'
 import { ROLE_LABELS } from './format'
 
 export function AppShell() {
   const user = useAppSelector((state) => state.auth.user)
   const dispatch = useAppDispatch()
   const [logout, { isLoading }] = useLogoutMutation()
+  // Polls once a minute: notifications are database rows, not pushed (outbox and Kafka are deferred).
+  const { data: unread } = useUnreadNotificationCountQuery(undefined, { pollingInterval: 60_000 })
 
   async function handleSignOut() {
     try {
@@ -35,6 +38,10 @@ export function AppShell() {
           <NavLink to="/skills">Skills</NavLink>
           {user?.role === 'STUDENT' && <NavLink to="/certifications">Certifications</NavLink>}
           {user?.role === 'STUDENT' && <NavLink to="/invitations">Invitations</NavLink>}
+          <NavLink to="/notifications">
+            Notifications
+            {unread && unread.count > 0 && <span className="nav-badge" aria-label={`${unread.count} unread`}>{unread.count}</span>}
+          </NavLink>
           <NavLink to="/change-password">Change password</NavLink>
         </nav>
         <div className="session">

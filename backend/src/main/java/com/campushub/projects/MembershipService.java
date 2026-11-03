@@ -7,6 +7,8 @@ import com.campushub.identity.UserStatus;
 import com.campushub.identity.audit.AuditOutcome;
 import com.campushub.identity.audit.AuditService;
 import com.campushub.identity.security.AuthenticatedUser;
+import com.campushub.notifications.NotificationService;
+import com.campushub.notifications.NotificationType;
 import com.campushub.projects.MembershipResponses.InvitationResponse;
 import com.campushub.projects.MembershipResponses.MemberResponse;
 import com.campushub.shared.errors.ApiException;
@@ -57,11 +59,13 @@ public class MembershipService {
     private final UserAccountRepository users;
     private final TaskRepository tasks;
     private final AuditService audit;
+    private final NotificationService notifications;
     private final Clock clock;
 
     public MembershipService(ProjectService projectService, ProjectRepository projects,
                              ProjectMemberRepository members, ProjectInvitationRepository invitations,
-                             UserAccountRepository users, TaskRepository tasks, AuditService audit, Clock clock) {
+                             UserAccountRepository users, TaskRepository tasks, AuditService audit,
+                             NotificationService notifications, Clock clock) {
         this.projectService = projectService;
         this.projects = projects;
         this.members = members;
@@ -69,6 +73,7 @@ public class MembershipService {
         this.users = users;
         this.tasks = tasks;
         this.audit = audit;
+        this.notifications = notifications;
         this.clock = clock;
     }
 
@@ -102,6 +107,7 @@ public class MembershipService {
         }
         members.deleteByProjectIdAndUserId(locked.getId(), userId);
         tasks.unassignOpenTasks(locked.getId(), userId, TaskStatus.DONE, clock.instant());
+        notifications.notify(userId, NotificationType.MEMBER_REMOVED, caller.userId(), locked.getId());
         audit.record(MEMBER_REMOVED, caller.userId(), PROJECT, projectId.toString(), AuditOutcome.SUCCESS,
                 request, Map.of());
     }
@@ -131,6 +137,7 @@ public class MembershipService {
         ProjectInvitation invitation = new ProjectInvitation(UUID.randomUUID(), locked.getId(), invitee.getId(),
                 caller.userId(), now, now.plus(INVITATION_LIFETIME));
         invitations.saveAndFlush(invitation);
+        notifications.notify(invitee.getId(), NotificationType.INVITATION_RECEIVED, caller.userId(), locked.getId());
         audit.record(INVITATION_CREATED, caller.userId(), PROJECT, projectId.toString(), AuditOutcome.SUCCESS,
                 request, Map.of());
         return toResponse(invitation, Map.of(invitee.getId(), invitee,
@@ -176,6 +183,8 @@ public class MembershipService {
         members.saveAndFlush(new ProjectMember(UUID.randomUUID(), locked.getId(), caller.userId(), now));
         invitation.accept(now);
         invitations.saveAndFlush(invitation);
+        notifications.notify(invitation.getInviterId(), NotificationType.INVITATION_ACCEPTED, caller.userId(),
+                locked.getId());
         audit.record(INVITATION_ACCEPTED, caller.userId(), PROJECT, locked.getId().toString(),
                 AuditOutcome.SUCCESS, request, Map.of());
         return toResponse(invitation, peopleFor(invitation), locked.getTitle(), now);
@@ -188,6 +197,8 @@ public class MembershipService {
         Instant now = clock.instant();
         invitation.decline(now);
         invitations.saveAndFlush(invitation);
+        notifications.notify(invitation.getInviterId(), NotificationType.INVITATION_DECLINED, caller.userId(),
+                invitation.getProjectId());
         Project project = projects.findById(invitation.getProjectId()).orElseThrow(MembershipService::notFound);
         audit.record(INVITATION_DECLINED, caller.userId(), PROJECT, project.getId().toString(),
                 AuditOutcome.SUCCESS, request, Map.of());

@@ -168,6 +168,21 @@ export interface Invitation {
   version: number
 }
 
+export type NotificationType = 'INVITATION_RECEIVED' | 'INVITATION_ACCEPTED' | 'INVITATION_DECLINED' | 'MEMBER_REMOVED'
+
+export interface Notification {
+  id: string
+  type: NotificationType
+  message: string
+  projectId?: string
+  createdAt: string
+  readAt?: string
+}
+
+export interface UnreadCount {
+  count: number
+}
+
 export type CalendarEntryType = 'TASK_DUE' | 'PROJECT_DUE' | 'MILESTONE_DUE'
 
 export interface CalendarEntry {

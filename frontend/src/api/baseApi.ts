@@ -79,6 +79,7 @@ export const baseApi = createApi({
     'Membership',
     'Invitation',
     'Calendar',
+    'Notification',
   ],
   endpoints: () => ({}),
 })
