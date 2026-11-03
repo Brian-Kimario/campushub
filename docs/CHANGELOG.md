@@ -7,6 +7,32 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [Phase A] — 2026-11-03 — Browser end-to-end verification and phone-width fix
+
+**Status:** Complete locally. Committed on `phase-7a-certifications` (`199e1a4` header nav fix). Not pushed.
+
+**Affected documents:** `docs/CHANGELOG.md` (this entry). Code: `frontend/src/index.css`.
+
+**Changed (code):**
+- The header navigation now wraps (`.app-header nav` has `flex-wrap: wrap`). At 375px the links pushed the page to 395px wide and caused horizontal page scroll. After the change the page is 375px wide on the calendar, projects, project detail, and dashboard pages.
+
+**Verified in the built-in browser, local demo accounts, localhost only:**
+- Student2 accepts a team invitation; the project's team section then lists Dev Student Two as a member ("2 of 5 people on this team").
+- Student2 sees no "Send invitation" form on the project page, and the projects list shows only the one project they belong to.
+- Student calendar: 20 Nov 2026 shows the "Write literature review" task, and 15 Dec 2026 shows the Demo Capstone Project due date. Both link to the project.
+- Admin sees all three projects. The admin panel on the project page shows supervisor assignment and archive controls. Archive was not clicked.
+- Faculty sees the two supervised projects. The dashboard shows 2 supervised projects, 2 awaiting review, and 2 needing attention. The submission panel shows the "Record decision" form. A decision was not submitted, so seed data is unchanged.
+
+**Not verified:**
+- Non-member access by direct URL. Only the list filter was checked. The list hides the student's "E2E smoke project" rows from student2, but no direct-URL request was made.
+- Invitations page and team panel at 375px. Only overflow was measured on the calendar, projects, project detail, and dashboard pages.
+- Submitting a faculty decision, and admin archive or supervisor reassignment.
+- Backend tests were not rerun in Phase A because this phase changed no backend code. The last full run is the Phase B and C run: 136 tests, 0 failures.
+
+**Environment note:** The `campushub-api-1` image was stale and returned 404 for the calendar route. Rebuilding it (`docker compose up -d --build api`) fixed this.
+
+**Known gaps (carried forward):** stale "E2E smoke project" rows in the local database. Not deleted; deleting needs approval.
+
 ## [Phase B and C] — 2026-11-03 — Project membership, invitations, and academic calendar
 
 **Status:** Complete locally. Committed on `phase-7a-certifications` (`9d4c6fd` membership backend, `c65a7c3` calendar backend, `b13091f` frontend). Not pushed. No edit to an applied migration.
