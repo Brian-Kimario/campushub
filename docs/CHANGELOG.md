@@ -27,7 +27,7 @@ Format: each entry has a date, a short title, and the affected documents. Accept
 **Not verified:** the team, invitation, and calendar screens in a browser with real data (Phase A sign-in is blocked until the demo password is supplied).
 
 **Known gaps:**
-- Removing a member does not unassign their open tasks. The contract text was written to require it, so this is open work before release.
+- Tasks have no assignee in the MVP (V5 documents this), so removing a member has no task side effects. The earlier contract wording about unassigning tasks was wrong for this build and is corrected.
 - Invitation expiry is derived on read; the scheduled expiry job is not built.
 - The calendar has no milestone deadlines (milestones are not in the schema).
 

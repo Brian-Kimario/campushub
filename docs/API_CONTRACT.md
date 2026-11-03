@@ -163,7 +163,7 @@ Catalog GET responses are cached (ADR-010). Every admin write evicts the affecte
 | Method | Path | Who | Purpose | Notes |
 |---|---|---|---|---|
 | GET | `/projects/{id}/members` | member, supervisor, admin | List | Basic profile fields only |
-| DELETE | `/projects/{id}/members/{userId}` | owner | Remove member | 204; cannot remove owner (422 `PRECONDITION_NOT_MET`). Removal revokes access at once. **Deviation (not built):** open tasks assigned to the removed member are not yet unassigned; this is open work before release |
+| DELETE | `/projects/{id}/members/{userId}` | owner | Remove member | 204; cannot remove owner (422 `PRECONDITION_NOT_MET`). Removal revokes access at once. Tasks have no assignee in the MVP (V5), so removal has no task side effects; the earlier wording about unassigning tasks does not apply |
 | POST | `/projects/{id}/invitations` | owner | Invite | 201; **deviation:** body carries `inviteeEmail`, not `inviteeId`; the invitee must be an ACTIVE STUDENT (otherwise 400 `VALIDATION_FAILED` on `inviteeEmail`); 409 `TEAM_FULL`; 409 `DUPLICATE` if already a member or PENDING |
 | GET | `/projects/{id}/invitations` | owner | List | Paginated. **Deviation:** ADMIN does not see invitation lists in this build |
 | GET | `/invitations/mine` | STUDENT | Own invitations | Paginated; `status` filter |
