@@ -1,0 +1,90 @@
+// Response shapes from the API (API_CONTRACT). The API omits null fields, so nullable values are optional.
+
+export type Role = 'STUDENT' | 'FACULTY' | 'ADMIN'
+
+export interface UserSummary {
+  id: string
+  email: string
+  institutionalId?: string
+  displayName: string
+  role: Role
+  status: 'ACTIVE' | 'DEACTIVATED'
+  mustChangePassword: boolean
+  departmentId?: string
+}
+
+export interface LoginResponse {
+  accessToken: string
+  tokenType: string
+  expiresIn: number
+  user: UserSummary
+}
+
+export interface PersonSummary {
+  id: string
+  displayName: string
+}
+
+export interface PageResponse<T> {
+  content: T[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+  sort: string[]
+}
+
+export type ProjectStatus = 'ACTIVE' | 'ARCHIVED'
+
+export interface Project {
+  id: string
+  title: string
+  description?: string
+  subject?: string
+  status: ProjectStatus
+  startDate?: string
+  dueDate?: string
+  owner?: PersonSummary
+  supervisor?: PersonSummary
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'BLOCKED' | 'DONE'
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH'
+
+export interface Task {
+  id: string
+  projectId: string
+  title: string
+  description?: string
+  status: TaskStatus
+  priority: TaskPriority
+  blockedReason?: string
+  dueDate?: string
+  completedAt?: string
+  createdBy: string
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type SubmissionStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'CHANGES_REQUESTED' | 'ACCEPTED'
+export type ReviewDecision = 'ACCEPTED' | 'CHANGES_REQUESTED'
+
+export interface Submission {
+  id: string
+  projectId: string
+  revisionNo: number
+  title: string
+  description?: string
+  link: string
+  status: SubmissionStatus
+  submittedBy: string
+  submittedAt: string
+  reviewedBy?: string
+  reviewedAt?: string
+  feedback?: string
+  version: number
+}
