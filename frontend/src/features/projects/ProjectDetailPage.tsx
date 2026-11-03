@@ -3,6 +3,7 @@ import { describeError } from '../../api/problem'
 import { useAppSelector } from '../../app/hooks'
 import { formatDate, formatInstant, PROJECT_STATUS_LABELS } from '../../components/format'
 import { EmptyState, ErrorState, PageLoading } from '../../components/ui'
+import { MilestonePanel } from '../milestones/MilestonePanel'
 import { SubmissionPanel } from '../submissions/SubmissionPanel'
 import { TaskPanel } from '../tasks/TaskPanel'
 import { ProjectAdminPanel } from './ProjectAdminPanel'
@@ -76,6 +77,7 @@ export default function ProjectDetailPage() {
         </section>
       )}
 
+      <MilestonePanel project={project} isOwner={isOwner} isSupervisor={isSupervisor} />
       <TaskPanel project={project} isOwner={isOwner} />
       <TeamPanel project={project} isOwner={isOwner} />
       <SubmissionPanel project={project} isOwner={isOwner} isSupervisor={isSupervisor} />

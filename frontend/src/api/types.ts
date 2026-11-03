@@ -71,6 +71,21 @@ export interface Task {
   updatedAt: string
 }
 
+export type MilestoneStatus = 'OPEN' | 'CLOSED'
+
+export interface Milestone {
+  id: string
+  projectId: string
+  sequence: number
+  title: string
+  dueAt: string
+  allowLate: boolean
+  status: MilestoneStatus
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
 export type SubmissionStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'CHANGES_REQUESTED' | 'ACCEPTED'
 export type ReviewDecision = 'ACCEPTED' | 'CHANGES_REQUESTED'
 
@@ -141,7 +156,7 @@ export interface Invitation {
   version: number
 }
 
-export type CalendarEntryType = 'TASK_DUE' | 'PROJECT_DUE'
+export type CalendarEntryType = 'TASK_DUE' | 'PROJECT_DUE' | 'MILESTONE_DUE'
 
 export interface CalendarEntry {
   type: CalendarEntryType

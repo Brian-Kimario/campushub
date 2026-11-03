@@ -70,7 +70,7 @@ The earlier summary said the MVP covers "P0 basics". That is only partly accurat
 | FR-PROJ-06 | Project completes when milestones closed | Missing | No COMPLETED state; no milestones | Depends on milestones (FR-MS-*). | P0 |
 | FR-PROJ-07 | Admin archives completed or rejected projects | Partial | `POST /projects/{id}/archive`; `PROJECT_ARCHIVED` read-only rule | State precondition (completed or rejected) not enforced because those states do not exist. | P0 |
 | FR-PROJ-08 | Lists scoped by membership and supervision | Partial | `ProjectService.canSee`; list by status | Term filter missing. Pagination exists. | P0 |
-| FR-PROJ-09 | Detail shows members, milestones, supervisor, progress | Partial | `ProjectDetailPage`: members, supervisor, status, tasks | No milestones. Progress metric: UNVERIFIED. | P0 |
+| FR-PROJ-09 | Detail shows members, milestones, supervisor, progress | Partial | `ProjectDetailPage`: members, supervisor, status, milestones, tasks | Progress metric: UNVERIFIED. | P0 |
 | FR-PROJ-10 | Status change and audit are atomic | Implemented | `AuditService` writes in the service transaction | Rollback-on-audit-failure test: UNVERIFIED. | P0 |
 | FR-TEAM-01 | Owner invites an ACTIVE student | Implemented | `POST /projects/{id}/invitations`; `pending_key` unique index (V11); 5-person cap; 14-day expiry | Invitee-must-be-ACTIVE-student check: UNVERIFIED. | P0 |
 | FR-TEAM-02 | Invitee accepts or declines | Implemented | `POST /invitations/{id}/accept` and `/decline`; team-full returns 409 under project lock | None found. | P0 |
@@ -81,9 +81,9 @@ The earlier summary said the MVP covers "P0 basics". That is only partly accurat
 
 | ID | Requirement | Status | Evidence | Remaining work | Priority |
 |---|---|---|---|---|---|
-| FR-MS-01 | Owner creates and edits milestones | Missing | No milestone table or endpoints | Table, endpoints, unique sequence. | P0 |
-| FR-MS-02 | Supervisor sets `allowLate` | Missing | No `allow_late` column | Depends on FR-MS-01. | P0 |
-| FR-MS-03 | Milestone closes; closed rejects submissions | Missing | No milestone status | Depends on FR-MS-01. | P0 |
+| FR-MS-01 | Owner creates and edits milestones | Implemented | V13 `milestones`; `MilestoneService`; `MilestoneFlowIntegrationTest`; browser create checked as owner | Browser edit of title or due date: UNVERIFIED (backend test only). | P0 |
+| FR-MS-02 | Supervisor sets `allowLate` | Implemented | `PATCH /milestones/{id}` with `allowLate` for the supervisor; `FIELD_NOT_EDITABLE` for the owner | Browser checked as supervisor. Enforcement on submissions: missing (FR-SUB-05). | P0 |
+| FR-MS-03 | Milestone closes; closed rejects submissions | Partial | `POST /milestones/{id}/close`; closed rejects edits and closes (409) | Submissions do not reference milestones, so closed does not reject submissions yet. Browser close: UNVERIFIED. | P0 |
 | FR-TASK-01 | Active member creates a task | Implemented | `POST /projects/{id}/tasks`; `TaskService` create | Project ACTIVE/APPROVED check: APPROVED does not exist. | P0 |
 | FR-TASK-02 | Task assigned to an active member or left unassigned | Implemented | V12 `assignee_id`; `TaskService.requireAssignable`; PATCH null unassigns; assignee select in `TaskForm` | Backend test `assigneeMustBeTheOwnerOrAnActiveMemberAndNullUnassigns`; browser assign checked. Deactivated assignees: UNVERIFIED (no deactivation endpoint, FR-PROF-04). | P0 |
 | FR-TASK-03 | Guarded status transitions | Implemented | `POST /tasks/{id}/transitions`; `TaskTransitions` | Direct `status` write rejection: UNVERIFIED. | P0 |
@@ -96,7 +96,7 @@ The earlier summary said the MVP covers "P0 basics". That is only partly accurat
 
 | ID | Requirement | Status | Evidence | Remaining work | Priority |
 |---|---|---|---|---|---|
-| FR-CAL-01 | Calendar returns milestones and tasks for a bounded range | Partial | `GET /calendar?from=&to=`; 92-day cap; `PROJECT_DUE` and `TASK_DUE` | Milestones missing. | P0 |
+| FR-CAL-01 | Calendar returns milestones and tasks for a bounded range | Implemented | `GET /calendar?from=&to=`; 92-day cap; `PROJECT_DUE`, `TASK_DUE`, `MILESTONE_DUE`; `MilestoneFlowIntegrationTest` calendar case | Browser display of `MILESTONE_DUE`: UNVERIFIED. | P0 |
 | FR-CAL-02 | UTC instants shown in local time, DST tested | Partial | Dates are `LocalDate` (documented deviation in API_CONTRACT §9) | UTC instant model and DST test. | P0 |
 
 ## 7. Submissions and reviews
@@ -175,7 +175,7 @@ The earlier summary said the MVP covers "P0 basics". That is only partly accurat
 ## Planned order of work (from this audit)
 
 1. Task assignment (FR-TASK-02, FR-TEAM-03). Done; see CHANGELOG "Phase E.1 and E.5".
-2. Milestones (FR-MS-01 to 03, FR-CAL-01 milestone deadlines, FR-PROJ-09 display).
+2. Milestones (FR-MS-01 to 03, FR-CAL-01 milestone deadlines, FR-PROJ-09 display). Done locally; see CHANGELOG "Phase E.2". FR-MS-03 submission rejection depends on item 3.
 3. Submission evidence files (FR-SUB-02 to 05, FR-CERT-02 storage).
 4. Invitation lifecycle tests (FR-TEAM-01 to 04).
 5. Task pagination in the UI.

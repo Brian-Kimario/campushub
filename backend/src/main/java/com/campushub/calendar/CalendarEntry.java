@@ -18,6 +18,7 @@ public record CalendarEntry(
 
     public enum EntryType {
         TASK_DUE,
-        PROJECT_DUE
+        PROJECT_DUE,
+        MILESTONE_DUE
     }
 }

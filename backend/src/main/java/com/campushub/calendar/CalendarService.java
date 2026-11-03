@@ -1,6 +1,8 @@
 package com.campushub.calendar;
 
 import com.campushub.identity.security.AuthenticatedUser;
+import com.campushub.milestones.Milestone;
+import com.campushub.milestones.MilestoneRepository;
 import com.campushub.projects.Project;
 import com.campushub.projects.ProjectRepository;
 import com.campushub.projects.ProjectService;
@@ -9,6 +11,7 @@ import com.campushub.shared.errors.ErrorCode;
 import com.campushub.tasks.Task;
 import com.campushub.tasks.TaskRepository;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -17,13 +20,14 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Deadlines from task and project due dates (API_CONTRACT §9). Each caller only sees deadlines of
  * projects they can already see through {@link ProjectService#canSee}, so the calendar never widens
- * access. Milestones are not in the schema yet, so they are not included.
+ * access. A milestone's due instant is shown on its UTC calendar day (ADR-013).
  */
 @Service
 public class CalendarService {
@@ -40,11 +44,14 @@ public class CalendarService {
     private final ProjectService projectService;
     private final ProjectRepository projects;
     private final TaskRepository tasks;
+    private final MilestoneRepository milestones;
 
-    public CalendarService(ProjectService projectService, ProjectRepository projects, TaskRepository tasks) {
+    public CalendarService(ProjectService projectService, ProjectRepository projects, TaskRepository tasks,
+                           MilestoneRepository milestones) {
         this.projectService = projectService;
         this.projects = projects;
         this.tasks = tasks;
+        this.milestones = milestones;
     }
 
     @Transactional(readOnly = true)
@@ -60,8 +67,12 @@ public class CalendarService {
         }
 
         List<Task> dueTasks = tasks.findDueBetween(from, to);
-        Map<UUID, Project> projectsById = projects.findAllById(dueTasks.stream()
-                        .map(Task::getProjectId)
+        List<Milestone> dueMilestones = milestones.findDueBetween(
+                from.atStartOfDay(ZoneOffset.UTC).toInstant(),
+                to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant());
+        Map<UUID, Project> projectsById = projects.findAllById(Stream.concat(
+                        dueTasks.stream().map(Task::getProjectId),
+                        dueMilestones.stream().map(Milestone::getProjectId))
                         .distinct()
                         .toList()).stream()
                 .collect(Collectors.toMap(Project::getId, Function.identity()));
@@ -70,6 +81,14 @@ public class CalendarService {
             if (project != null && projectService.canSee(caller, project)) {
                 result.add(new CalendarEntry(CalendarEntry.EntryType.TASK_DUE, task.getDueDate(), task.getId(),
                         task.getTitle(), task.getStatus().name(), project.getId(), project.getTitle()));
+            }
+        }
+        for (Milestone milestone : dueMilestones) {
+            Project project = projectsById.get(milestone.getProjectId());
+            if (project != null && projectService.canSee(caller, project)) {
+                result.add(new CalendarEntry(CalendarEntry.EntryType.MILESTONE_DUE,
+                        milestone.getDueAt().atOffset(ZoneOffset.UTC).toLocalDate(), milestone.getId(),
+                        milestone.getTitle(), milestone.getStatus().name(), project.getId(), project.getTitle()));
             }
         }
         result.sort(ORDER);

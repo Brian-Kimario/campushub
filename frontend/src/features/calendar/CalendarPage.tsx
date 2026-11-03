@@ -31,6 +31,7 @@ function parseIsoDate(value: string): Date {
 const TYPE_LABELS: Record<CalendarEntry['type'], string> = {
   TASK_DUE: 'Task due',
   PROJECT_DUE: 'Project due',
+  MILESTONE_DUE: 'Milestone due',
 }
 
 export default function CalendarPage() {

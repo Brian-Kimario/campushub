@@ -7,6 +7,37 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [Phase E.2] — 2026-11-03 — Milestones and calendar deadlines
+
+**Status:** Complete locally. Not pushed. Not committed at the time of writing.
+
+**Affected documents:** `docs/CHANGELOG.md` (this entry), `docs/MASTER_BLUEPRINT_COMPLIANCE.md` (FR-MS, FR-CAL-01, FR-PROJ-09, FR-SUB-05 rows, planned order). Code: `backend/src/main/resources/db/migration/V13__milestones.sql`, `backend/src/main/java/com/campushub/milestones/`, `backend/src/main/java/com/campushub/calendar/CalendarService.java`, `frontend/src/features/milestones/`.
+
+**Changed (code):**
+- Flyway V13 creates `milestones`: per-project `sequence` (unique with `project_id`, at least 1), `title` (3 to 200 characters), `due_at`, `allow_late` (default false), `status` (`OPEN` or `CLOSED`), and a version column for optimistic locking. No existing row is changed.
+- `GET /projects/{id}/milestones` lists milestones for anyone who can see the project. `POST` creates one (owner only; sequence assigned under a project row lock). `PATCH /milestones/{id}` takes a version: the owner edits `title` and `dueAt`, a supervisor edits `allowLate`, and sending a field the caller may not change returns 400 `FIELD_NOT_EDITABLE`. `POST /milestones/{id}/close` closes a milestone (owner or supervisor); closing is permanent in this version.
+- Hidden projects return 404 for every milestone route. Archived projects return 422 `PROJECT_ARCHIVED` for writes. Closed milestones return 409 `INVALID_TRANSITION` for edits and closes.
+- `GET /calendar` returns `MILESTONE_DUE` entries on the UTC calendar day of `dueAt`, filtered by project visibility, alongside `TASK_DUE` and `PROJECT_DUE`.
+- Frontend: the project page shows a Milestones panel. The owner can create and edit a milestone, a supervisor can toggle `allowLate`, and the owner or supervisor can close one behind a confirmation dialog. The calendar labels `MILESTONE_DUE` as "Milestone due".
+
+**Verified:**
+- `./mvnw -B verify`: 149 tests, 0 failures, BUILD SUCCESS. `MilestoneFlowIntegrationTest` (11 tests) covers sequencing, invalid input, stranger 404, member read-only, owner and supervisor field rules, stale version 409, close irreversibility, admin 403, other faculty 404, archived 422, and the calendar entry.
+- `npm run build` (`tsc -b` and `vite build`) and `npm run lint`: exit 0.
+- Local stack: V13 applied to the existing dev database (`Successfully applied 1 migration ... now at version v13`). Built-in browser, as the project owner: created "Literature review submitted" due 1 Dec 2026, 09:00; it showed "Late submissions not allowed". As the supervisor (faculty): ticked "Allow late submissions" and the text changed to "Late submissions allowed".
+
+**Not verified:**
+- Browser edit of title or due date, and browser close. Both are covered by backend tests only. Close was not clicked in the browser because it is irreversible.
+- Calendar display of `MILESTONE_DUE` in the browser.
+
+**Known gaps:**
+- Submissions are not linked to milestones, so a closed milestone does not yet reject submissions and `allowLate` is not enforced (FR-SUB-05 remains missing).
+- Tasks have no `milestoneId`, and there is no task filter by milestone or assignee.
+- Milestone creation does not check that `dueAt` is in the future.
+- `ProjectStatus` has only `ACTIVE` and `ARCHIVED`. The project COMPLETED state (FR-PROJ-06) is not built, so it does not depend on milestones yet.
+- No progress metric on the project page (FR-PROJ-09 progress remains UNVERIFIED).
+
+**Environment note:** the dev API container was rebuilt to apply V13. The demo milestone "Literature review submitted" was created in the dev database during the browser check. This is local seed data, not reset.
+
 ## [Phase E.1 and E.5] — 2026-11-03 — Task assignment and task pagination
 
 **Status:** Complete locally. Not pushed. Not committed at the time of writing.

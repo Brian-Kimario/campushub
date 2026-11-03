@@ -68,6 +68,7 @@ export const baseApi = createApi({
   tagTypes: [
     'Project',
     'Task',
+    'Milestone',
     'Submission',
     'Faculty',
     'Skill',
