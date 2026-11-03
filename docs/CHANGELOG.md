@@ -7,6 +7,36 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [Phase G] — 2026-11-04 — Final local verification
+
+**Status:** Complete for local verification. Not pushed. The fix below is committed locally.
+
+**Affected documents:** `docs/CHANGELOG.md` (this entry). Code: `frontend/src/index.css` (checkbox layout on the notifications page).
+
+**Verified:**
+- Backend: `./mvnw -B verify` passed on the Phase F tree with 180 tests and 0 failures. No backend code changed after that run.
+- Frontend: `npm run build` (type check and bundle) and `npm run lint` pass.
+- Docker Compose: `api` image rebuilt from the Phase F tree with `docker compose up -d --build api`. The MySQL volume was not reset. Flyway applied V15 (`notifications`) on top of V14. The API started, but `/actuator/health` returns 401 (known, see below).
+- Authorization, API smoke against the running stack: unauthenticated `GET /notifications` returns 401; a student calling `POST /admin/skills` returns 403; a faculty user's `GET /invitations/mine` returns 403; a student reading another user's notification id returns 404; another student reading a project's tasks returns 404.
+- Authorization and upload security, by backend tests: `facultyCannotCreateProjects`, `facultyDirectoryIsAdminOnly`, `facultyAndAdministratorsCannotReadOrWriteStudentSkills`, `facultyCannotUploadButTheSupervisorCanReadTheFiles`, `strangersAndAdminsGetNotFoundForFiles`, `fileIdFromAnotherSubmissionIsNotFound`, `pngAndJpegAreDetectedFromTheirBytes`, `contentThatDoesNotMatchItsNameOrSignatureIsRefused`, `fileOverTheSizeLimitIsRefusedWith413`, `sixthFileOnOneRevisionIsRefused`.
+- Browser, student and student2 in the built-in browser: sign-in works; the header shows the unread badge (1) after an invitation; the inbox shows "You were invited to join \"E2E smoke project\"."; mark as read clears the badge and shows the read time.
+- Mobile width (375px): no horizontal page scroll on the notifications page.
+
+**Fixed during verification:**
+- The "Show unread only" checkbox on the notifications page stretched to full width because the global input style applies. Added `.checkbox-row input { width: auto; }`.
+
+**Not verified:**
+- Browser E2E as the faculty and administrator roles. Their access rules are verified by the API smoke checks and the backend tests above, not by clicking through the UI.
+- Browser E2E for the other Phase D and E features (team, milestones, evidence upload, certifications) across all roles. Only the notifications flow was driven in the browser.
+- Mobile responsiveness beyond the notifications page. Not checked elsewhere.
+- Docker Compose health: `/actuator/health` returns 401 when unauthenticated, so the compose healthcheck (if any) cannot use it. Not investigated.
+- GitHub Actions: backend and image build pass on PR #1. The GitGuardian check fails. This is Phase H work and was not changed here.
+
+**Known gaps (carried forward):**
+- No revoke endpoint for pending invitations. Invitee ACTIVE-student check: unverified in the browser.
+- Hikari "Communications link failure" ERROR logs appear in some test runs. The build still passes.
+- Outbox and Kafka are deferred (FR-EVT-01 to 04 Missing). See Phase F.
+
 ## [Phase F] — 2026-11-04 — Database-backed notifications with read state
 
 **Status:** Complete locally. Not pushed. Committed locally at the time of writing.
