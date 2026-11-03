@@ -26,6 +26,18 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
+  kafka:
+    # Used only when campushub.kafka.enabled is true. Producers are idempotent with acks=all (FR-EVT-02).
+    bootstrap-servers: ${CAMPUSHUB_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+    consumer:
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    listener:
+      ack-mode: record
 
 server:
   port: 8080
@@ -71,6 +83,13 @@ campushub:
     max-files-per-version: ${CAMPUSHUB_UPLOAD_MAX_FILES_PER_VERSION:5}
   institution-timezone: ${CAMPUSHUB_INSTITUTION_TIMEZONE:UTC}
   kafka:
+    # Off by default (ADR-011). When off, no outbox rows are written and no broker connection is made.
     enabled: ${CAMPUSHUB_KAFKA_ENABLED:false}
+    consumer-group: campushub
+    relay-interval-ms: 2000
+    send-timeout-ms: 10000
+    retry:
+      initial-interval-ms: 500
+      max-elapsed-ms: 5000
   dev-seed-enabled: ${CAMPUSHUB_DEV_SEED_ENABLED:false}
   dev-seed-password: ${CAMPUSHUB_DEV_SEED_PASSWORD:}

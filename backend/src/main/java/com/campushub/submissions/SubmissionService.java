@@ -1,5 +1,7 @@
 package com.campushub.submissions;
 
+import com.campushub.events.DomainEventType;
+import com.campushub.events.OutboxService;
 import com.campushub.identity.Role;
 import com.campushub.identity.audit.AuditOutcome;
 import com.campushub.identity.audit.AuditService;
@@ -30,12 +32,15 @@ public class SubmissionService {
     private final SubmissionRepository submissions;
     private final ProjectService projects;
     private final AuditService audit;
+    private final OutboxService outbox;
     private final Clock clock;
 
-    public SubmissionService(SubmissionRepository submissions, ProjectService projects, AuditService audit, Clock clock) {
+    public SubmissionService(SubmissionRepository submissions, ProjectService projects, AuditService audit,
+                             OutboxService outbox, Clock clock) {
         this.submissions = submissions;
         this.projects = projects;
         this.audit = audit;
+        this.outbox = outbox;
         this.clock = clock;
     }
 
@@ -114,6 +119,12 @@ public class SubmissionService {
         submissions.saveAndFlush(submission);
         String action = body.decision() == ReviewDecision.ACCEPTED ? "submission.accepted" : "submission.changes_requested";
         audit.record(action, caller.userId(), SUBMISSION, id.toString(), AuditOutcome.SUCCESS, request, Map.of());
+        outbox.record(DomainEventType.SUBMISSION_REVIEWED, SUBMISSION, id.toString(), Map.<String, Object>of(
+                "recipientId", submission.getSubmittedBy().toString(),
+                "actorId", caller.userId().toString(),
+                "projectId", submission.getProjectId().toString(),
+                "submissionId", id.toString(),
+                "decision", body.decision().name()));
         return toResponse(submission);
     }
 

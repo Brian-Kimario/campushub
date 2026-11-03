@@ -1,5 +1,7 @@
 package com.campushub.projects;
 
+import com.campushub.events.DomainEventType;
+import com.campushub.events.OutboxService;
 import com.campushub.identity.Role;
 import com.campushub.identity.UserAccount;
 import com.campushub.identity.UserAccountRepository;
@@ -60,12 +62,13 @@ public class MembershipService {
     private final TaskRepository tasks;
     private final AuditService audit;
     private final NotificationService notifications;
+    private final OutboxService outbox;
     private final Clock clock;
 
     public MembershipService(ProjectService projectService, ProjectRepository projects,
                              ProjectMemberRepository members, ProjectInvitationRepository invitations,
                              UserAccountRepository users, TaskRepository tasks, AuditService audit,
-                             NotificationService notifications, Clock clock) {
+                             NotificationService notifications, OutboxService outbox, Clock clock) {
         this.projectService = projectService;
         this.projects = projects;
         this.members = members;
@@ -74,6 +77,7 @@ public class MembershipService {
         this.tasks = tasks;
         this.audit = audit;
         this.notifications = notifications;
+        this.outbox = outbox;
         this.clock = clock;
     }
 
@@ -108,6 +112,8 @@ public class MembershipService {
         members.deleteByProjectIdAndUserId(locked.getId(), userId);
         tasks.unassignOpenTasks(locked.getId(), userId, TaskStatus.DONE, clock.instant());
         notifications.notify(userId, NotificationType.MEMBER_REMOVED, caller.userId(), locked.getId());
+        outbox.record(DomainEventType.MEMBER_REMOVED, PROJECT, locked.getId().toString(),
+                eventFields(userId, caller.userId(), locked.getId()));
         audit.record(MEMBER_REMOVED, caller.userId(), PROJECT, projectId.toString(), AuditOutcome.SUCCESS,
                 request, Map.of());
     }
@@ -138,6 +144,8 @@ public class MembershipService {
                 caller.userId(), now, now.plus(INVITATION_LIFETIME));
         invitations.saveAndFlush(invitation);
         notifications.notify(invitee.getId(), NotificationType.INVITATION_RECEIVED, caller.userId(), locked.getId());
+        outbox.record(DomainEventType.INVITATION_RECEIVED, PROJECT, locked.getId().toString(),
+                eventFields(invitee.getId(), caller.userId(), locked.getId()));
         audit.record(INVITATION_CREATED, caller.userId(), PROJECT, projectId.toString(), AuditOutcome.SUCCESS,
                 request, Map.of());
         return toResponse(invitation, Map.of(invitee.getId(), invitee,
@@ -185,6 +193,8 @@ public class MembershipService {
         invitations.saveAndFlush(invitation);
         notifications.notify(invitation.getInviterId(), NotificationType.INVITATION_ACCEPTED, caller.userId(),
                 locked.getId());
+        outbox.record(DomainEventType.INVITATION_ACCEPTED, PROJECT, locked.getId().toString(),
+                eventFields(invitation.getInviterId(), caller.userId(), locked.getId()));
         audit.record(INVITATION_ACCEPTED, caller.userId(), PROJECT, locked.getId().toString(),
                 AuditOutcome.SUCCESS, request, Map.of());
         return toResponse(invitation, peopleFor(invitation), locked.getTitle(), now);
@@ -199,6 +209,8 @@ public class MembershipService {
         invitations.saveAndFlush(invitation);
         notifications.notify(invitation.getInviterId(), NotificationType.INVITATION_DECLINED, caller.userId(),
                 invitation.getProjectId());
+        outbox.record(DomainEventType.INVITATION_DECLINED, PROJECT, invitation.getProjectId().toString(),
+                eventFields(invitation.getInviterId(), caller.userId(), invitation.getProjectId()));
         Project project = projects.findById(invitation.getProjectId()).orElseThrow(MembershipService::notFound);
         audit.record(INVITATION_DECLINED, caller.userId(), PROJECT, project.getId().toString(),
                 AuditOutcome.SUCCESS, request, Map.of());
@@ -253,6 +265,12 @@ public class MembershipService {
 
     private long teamSize(Project project) {
         return 1 + members.countByProjectId(project.getId());
+    }
+
+    /** Event payload: IDs only, no free text (FR-EVT). */
+    private static Map<String, Object> eventFields(UUID recipientId, UUID actorId, UUID projectId) {
+        return Map.<String, Object>of("recipientId", recipientId.toString(), "actorId", actorId.toString(),
+                "projectId", projectId.toString());
     }
 
     private static void requireStudent(AuthenticatedUser caller) {

@@ -29,6 +29,8 @@ services:
     environment:
       # Compose network host name; overrides the localhost default in .env.
       CAMPUSHUB_DB_HOST: mysql
+      # Used only when CAMPUSHUB_KAFKA_ENABLED=true and the kafka profile is running.
+      CAMPUSHUB_KAFKA_BOOTSTRAP_SERVERS: kafka:19092
       SPRING_PROFILES_ACTIVE: dev
     depends_on:
       mysql:
@@ -37,6 +39,26 @@ services:
       - "8080:8080"
     volumes:
       - storage:/var/campushub/storage
+
+  # Optional event broker (ADR-011). Start with: docker compose --profile kafka up -d
+  # Single node, KRaft mode, no ZooKeeper. The image is pinned by digest, like the others.
+  kafka:
+    profiles: ["kafka"]
+    image: apache/kafka:3.9.1@sha256:4ceccc577f03f51f6af8dbfda55194d0d892f4fa7913ffbded567ce3895622ed
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: EXTERNAL://0.0.0.0:9092,INTERNAL://0.0.0.0:19092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: EXTERNAL://localhost:9092,INTERNAL://kafka:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    ports:
+      - "127.0.0.1:9092:9092"
 
 volumes:
   storage:
