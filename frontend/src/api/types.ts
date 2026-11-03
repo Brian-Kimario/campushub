@@ -88,3 +88,20 @@ export interface Submission {
   feedback?: string
   version: number
 }
+
+export type SkillProficiency = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'EXPERT'
+
+export interface Skill {
+  id: string
+  name: string
+  category: string
+}
+
+export interface OwnSkill {
+  skillId: string
+  name: string
+  category: string
+  proficiency: SkillProficiency
+  evidenceNote: string | null
+  updatedAt: string
+}

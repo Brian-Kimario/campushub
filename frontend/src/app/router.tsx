@@ -9,6 +9,7 @@ import {
   ProjectDetailPage,
   ProjectFormPage,
   ProjectListPage,
+  SkillsPage,
 } from './lazyPages'
 
 function lazyPage(page: ReactNode) {
@@ -31,6 +32,7 @@ export const router = createBrowserRouter([
       { path: 'projects/new', element: lazyPage(<ProjectFormPage />) },
       { path: 'projects/:projectId', element: lazyPage(<ProjectDetailPage />) },
       { path: 'projects/:projectId/edit', element: lazyPage(<ProjectFormPage />) },
+      { path: 'skills', element: lazyPage(<SkillsPage />) },
       { path: '*', element: <Navigate to="/projects" replace /> },
     ],
   },

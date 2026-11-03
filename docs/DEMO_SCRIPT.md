@@ -136,6 +136,15 @@ The seeded accounts do not require a password change. Use this step with an acco
    - Expected: the old password is refused with the generic message; the new one works.
 3. Restore the original password with the same steps, so the demo accounts stay usable.
 
+### 3.8 Skills (Phase 5B)
+
+1. Sign in as the administrator and open `/skills`. Add a skill, for example `Java` in `Programming`.
+   - Expected: it appears in the catalog. Adding `JAVA` or `  java ` again shows "A skill with this name already exists."
+2. Sign in as the student and open `/skills`. Add `Java` to "My skills", set the proficiency to Intermediate, add a short evidence note, and save.
+   - Expected: "Your skills are saved." After a reload the same values appear.
+3. Check the administrator and faculty views of `/skills`.
+   - Expected: no "My skills" editor. The catalog is visible to both, and the add form appears only for the administrator.
+
 ## 4. Verification status
 
 What was checked, and how. Anything not listed as verified was not demonstrated end to end in the browser.

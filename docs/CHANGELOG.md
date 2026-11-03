@@ -7,6 +7,28 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [Phase 5B student skills] — 2026-11-03 — Skill catalog and student proficiency
+
+**Status:** Complete locally. Not pushed.
+
+**Affected documents:** `docs/DEMO_SCRIPT.md` (§3.8 skills walkthrough), `docs/CHANGELOG.md` (this entry). `docs/DATA_MODEL.md` §8 and `docs/API_CONTRACT.md` §3 and §11 already described this scope and were left unchanged.
+
+**Changed (code):**
+- Flyway V8 creates `skills` (unique `name_key`, `category`, `active`) and `user_skills` (PK user and skill, four-level proficiency CHECK, evidence note up to 500 characters).
+- `GET /skills` (any signed-in user, paginated, `category` filter); `POST /admin/skills` (ADMIN, 201, 409 `DUPLICATE` on the normalized name).
+- `GET /users/me/skills` and `PUT /users/me/skills` (STUDENT only). The PUT replaces the full set atomically, validates every entry before writing, and accepts at most 50 entries. A refused request leaves the previous set in place. Other roles get 403 `FORBIDDEN_ROLE`.
+- `ErrorCode.DUPLICATE` (409) added.
+- Frontend `/skills` page: catalog with pagination, admin add form with a duplicate check, and a student editor with proficiency, evidence note, a 50-skill cap, and a confirmation before removing a skill.
+
+**Decision:** proficiency uses the four levels in DATA_MODEL §8 (BEGINNER, INTERMEDIATE, ADVANCED, EXPERT). This is the open point to confirm against the directive, which may list three.
+
+**Verified:**
+- `./mvnw -B verify`: 108 tests, 0 failures (BUILD SUCCESS). This includes 11 skills integration tests in `SkillFlowIntegrationTest`.
+- `npm run build` and `npx oxlint src` (exit 0).
+- Built-in browser: admin adds a skill and gets a duplicate refusal for `JAVA`; student adds two skills, sets proficiency and an evidence note, saves, reloads, and sees the values; the remove confirmation cancels. The database rows match.
+
+**Not verified:** faculty view of `/skills` in the browser; a student's PUT with an invalid entry in the browser (backend test covers it); GitHub Actions has not run on these changes.
+
 ## [Phase 5A session restore] — 2026-11-03 — Refresh-cookie sessions and reliable sign-out
 
 **Status:** Complete locally. Not pushed.

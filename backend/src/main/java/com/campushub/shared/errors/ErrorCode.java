@@ -20,6 +20,7 @@ public enum ErrorCode {
     NOT_FOUND(HttpStatus.NOT_FOUND, "Resource not found"),
     STALE_VERSION(HttpStatus.CONFLICT, "Version conflict"),
     INVALID_TRANSITION(HttpStatus.CONFLICT, "Invalid state transition"),
+    DUPLICATE(HttpStatus.CONFLICT, "Duplicate value"),
     PROJECT_ARCHIVED(HttpStatus.UNPROCESSABLE_ENTITY, "Project is archived"),
     SUPERVISOR_NOT_ELIGIBLE(HttpStatus.UNPROCESSABLE_ENTITY, "Supervisor not eligible"),
     REVIEW_EXISTS(HttpStatus.CONFLICT, "Review already recorded"),

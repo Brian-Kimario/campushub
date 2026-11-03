@@ -30,6 +30,7 @@ export function AppShell() {
         <span className="brand">CampusHub</span>
         <nav aria-label="Main">
           <NavLink to="/projects">Projects</NavLink>
+          <NavLink to="/skills">Skills</NavLink>
           <NavLink to="/change-password">Change password</NavLink>
         </nav>
         <div className="session">
