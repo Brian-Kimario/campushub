@@ -7,6 +7,7 @@ import com.campushub.identity.security.JwtTokenService;
 import com.campushub.shared.errors.ApiException;
 import com.campushub.shared.errors.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -94,7 +95,7 @@ public class AuthService {
                     Map.of("reason", "deactivated"));
             return Optional.empty();
         }
-        if (!passwordEncoder.matches(password, account.getPasswordHash())) {
+        if (!matchesPassword(password, account.getPasswordHash())) {
             if (account.recordFailedLogin(now, MAX_FAILED_ATTEMPTS, LOCKOUT)) {
                 audit.record(ACCOUNT_LOCKED, account.getId(), USER, targetId, AuditOutcome.DENIED, request,
                         Map.of("reason", "too_many_failures"));
@@ -131,11 +132,11 @@ public class AuthService {
     @Transactional
     public void changePassword(UUID userId, String currentPassword, String newPassword, HttpServletRequest request) {
         UserAccount account = users.findById(userId).orElseThrow(AuthService::unauthenticated);
-        if (!passwordEncoder.matches(currentPassword, account.getPasswordHash())) {
+        if (!matchesPassword(currentPassword, account.getPasswordHash())) {
             throw new ApiException(ErrorCode.INVALID_CREDENTIALS, "The current password is incorrect.");
         }
         List<String> reasons = PasswordPolicy.violations(newPassword);
-        if (reasons.isEmpty() && passwordEncoder.matches(newPassword, account.getPasswordHash())) {
+        if (reasons.isEmpty() && matchesPassword(newPassword, account.getPasswordHash())) {
             reasons = List.of("must differ from the current password");
         }
         if (!reasons.isEmpty()) {
@@ -146,6 +147,16 @@ public class AuthService {
         Instant now = clock.instant();
         account.changePassword(passwordEncoder.encode(newPassword), false, now.truncatedTo(ChronoUnit.SECONDS), now);
         audit.record(PASSWORD_CHANGED, userId, USER, userId.toString(), AuditOutcome.SUCCESS, request, Map.of());
+    }
+
+    /**
+     * BCrypt truncates input at 72 bytes, so a longer candidate could match a stored hash by its
+     * prefix alone. Such a candidate is never a valid password, so it is rejected after the
+     * encoder runs (keeping the timing close to a normal comparison).
+     */
+    private boolean matchesPassword(String candidate, String hash) {
+        boolean matches = passwordEncoder.matches(candidate, hash);
+        return matches && candidate.getBytes(StandardCharsets.UTF_8).length <= PasswordPolicy.MAX_BYTES;
     }
 
     private static String normalize(String email) {

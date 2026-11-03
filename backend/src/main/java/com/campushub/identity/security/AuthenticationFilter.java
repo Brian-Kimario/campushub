@@ -32,7 +32,7 @@ public class AuthenticationFilter extends OncePerRequestFilter {
 
     /** Endpoints a user with a pending forced password change may still call (API_CONTRACT §2). */
     private static final Set<String> PASSWORD_CHANGE_EXEMPT = Set.of(
-            "/auth/me", "/auth/logout", "/auth/change-password");
+            "/api/v1/auth/me", "/api/v1/auth/logout", "/api/v1/auth/change-password");
 
     private final JwtTokenService tokens;
     private final UserAccountRepository users;

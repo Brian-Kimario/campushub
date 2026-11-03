@@ -1,6 +1,7 @@
 package com.campushub.identity;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,6 +12,8 @@ import org.springframework.data.repository.query.Param;
 public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> {
 
     Optional<UserAccount> findByEmail(String email);
+
+    List<UserAccount> findByRoleAndStatusOrderByDisplayNameAsc(Role role, UserStatus status);
 
     /** Scheduled reset of expired lockout windows (OPERATIONS §5, minute 25 UTC). */
     @Modifying

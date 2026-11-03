@@ -110,7 +110,7 @@ class AuthFlowIntegrationTest {
     }
 
     private ResultActions login(String email, String password) throws Exception {
-        return mockMvc.perform(post("/auth/login").with(fromNewAddress())
+        return mockMvc.perform(post("/api/v1/auth/login").with(fromNewAddress())
                 .contentType("application/json")
                 .content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}"));
     }
@@ -155,7 +155,7 @@ class AuthFlowIntegrationTest {
     void meReturnsTheCallerForAValidToken() throws Exception {
         UserAccount account = account(Role.STUDENT, false);
 
-        mockMvc.perform(get("/auth/me").header("Authorization", bearer(tokenFor(account))))
+        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", bearer(tokenFor(account))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(account.getId().toString()))
                 .andExpect(jsonPath("$.role").value("STUDENT"));
@@ -163,7 +163,7 @@ class AuthFlowIntegrationTest {
 
     @Test
     void requestWithoutTokenIsUnauthenticatedWithChallenge() throws Exception {
-        mockMvc.perform(get("/auth/me"))
+        mockMvc.perform(get("/api/v1/auth/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string("WWW-Authenticate", "Bearer"))
                 .andExpect(header().string("Content-Type", "application/problem+json"))
@@ -184,7 +184,7 @@ class AuthFlowIntegrationTest {
                 .build());
         expired.sign(new MACSigner(JWT_SECRET.getBytes(StandardCharsets.UTF_8)));
 
-        mockMvc.perform(get("/auth/me").header("Authorization", bearer(expired.serialize())))
+        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", bearer(expired.serialize())))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value("UNAUTHENTICATED"));
     }
@@ -194,9 +194,9 @@ class AuthFlowIntegrationTest {
         UserAccount account = account(Role.STUDENT, false);
         String token = tokenFor(account);
 
-        mockMvc.perform(post("/auth/logout").header("Authorization", bearer(token)))
+        mockMvc.perform(post("/api/v1/auth/logout").header("Authorization", bearer(token)))
                 .andExpect(status().isNoContent());
-        mockMvc.perform(get("/auth/me").header("Authorization", bearer(token)))
+        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", bearer(token)))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -206,12 +206,12 @@ class AuthFlowIntegrationTest {
         String before = tokenFor(account);
         Thread.sleep(1100); // revoked_after has one-second precision (ADR-019)
 
-        mockMvc.perform(post("/auth/change-password").header("Authorization", bearer(before))
+        mockMvc.perform(post("/api/v1/auth/change-password").header("Authorization", bearer(before))
                         .contentType("application/json")
                         .content("{\"currentPassword\":\"" + PASSWORD + "\",\"newPassword\":\"a-brand-new-passphrase\"}"))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/auth/me").header("Authorization", bearer(before)))
+        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", bearer(before)))
                 .andExpect(status().isUnauthorized());
         login(account.getEmail(), "a-brand-new-passphrase").andExpect(status().isOk());
     }
@@ -220,9 +220,22 @@ class AuthFlowIntegrationTest {
     void changePasswordRejectsAWeakReplacement() throws Exception {
         UserAccount account = account(Role.STUDENT, false);
 
-        mockMvc.perform(post("/auth/change-password").header("Authorization", bearer(tokenFor(account)))
+        mockMvc.perform(post("/api/v1/auth/change-password").header("Authorization", bearer(tokenFor(account)))
                         .contentType("application/json")
                         .content("{\"currentPassword\":\"" + PASSWORD + "\",\"newPassword\":\"short\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("newPassword"));
+    }
+
+    @Test
+    void changePasswordRejectsAReplacementLongerThanBcryptCanHold() throws Exception {
+        UserAccount account = account(Role.STUDENT, false);
+        String seventyThreeBytes = "a".repeat(73);
+
+        mockMvc.perform(post("/api/v1/auth/change-password").header("Authorization", bearer(tokenFor(account)))
+                        .contentType("application/json")
+                        .content("{\"currentPassword\":\"" + PASSWORD + "\",\"newPassword\":\"" + seventyThreeBytes + "\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.errors[0].field").value("newPassword"));
@@ -233,10 +246,10 @@ class AuthFlowIntegrationTest {
         UserAccount account = account(Role.STUDENT, true);
         String token = tokenFor(account);
 
-        mockMvc.perform(get("/auth/me").header("Authorization", bearer(token)))
+        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.mustChangePassword").value(true));
-        mockMvc.perform(get("/probe/ping").header("Authorization", bearer(token)))
+        mockMvc.perform(get("/api/v1/probe/ping").header("Authorization", bearer(token)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value("PASSWORD_CHANGE_REQUIRED"));
     }
@@ -245,7 +258,7 @@ class AuthFlowIntegrationTest {
     void studentIsForbiddenFromAdminEndpoints() throws Exception {
         UserAccount student = account(Role.STUDENT, false);
 
-        mockMvc.perform(get("/admin/probe").header("Authorization", bearer(tokenFor(student))))
+        mockMvc.perform(get("/api/v1/admin/probe").header("Authorization", bearer(tokenFor(student))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value("FORBIDDEN_ROLE"));
     }
@@ -254,7 +267,7 @@ class AuthFlowIntegrationTest {
     void adminCanReachAdminEndpoints() throws Exception {
         UserAccount admin = account(Role.ADMIN, false);
 
-        mockMvc.perform(get("/admin/probe").header("Authorization", bearer(tokenFor(admin))))
+        mockMvc.perform(get("/api/v1/admin/probe").header("Authorization", bearer(tokenFor(admin))))
                 .andExpect(status().isOk());
     }
 
@@ -263,10 +276,10 @@ class AuthFlowIntegrationTest {
         UserAccount owner = account(Role.STUDENT, false);
         UserAccount other = account(Role.STUDENT, false);
 
-        mockMvc.perform(get("/probe/records/" + owner.getId()).header("Authorization", bearer(tokenFor(other))))
+        mockMvc.perform(get("/api/v1/probe/records/" + owner.getId()).header("Authorization", bearer(tokenFor(other))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("NOT_FOUND"));
-        mockMvc.perform(get("/probe/records/" + owner.getId()).header("Authorization", bearer(tokenFor(owner))))
+        mockMvc.perform(get("/api/v1/probe/records/" + owner.getId()).header("Authorization", bearer(tokenFor(owner))))
                 .andExpect(status().isOk());
     }
 
@@ -290,11 +303,11 @@ class AuthFlowIntegrationTest {
     void twentyFirstAttemptFromOneAddressIsRateLimitedWithRetryAfter() throws Exception {
         RequestPostProcessor address = fromNewAddress();
         for (int i = 0; i < 20; i++) {
-            mockMvc.perform(post("/auth/login").with(address).contentType("application/json")
+            mockMvc.perform(post("/api/v1/auth/login").with(address).contentType("application/json")
                             .content("{\"email\":\"x-" + i + "@campushub.test\",\"password\":\"wrong-password-123\"}"))
                     .andExpect(status().isUnauthorized());
         }
-        mockMvc.perform(post("/auth/login").with(address).contentType("application/json")
+        mockMvc.perform(post("/api/v1/auth/login").with(address).contentType("application/json")
                         .content("{\"email\":\"x@campushub.test\",\"password\":\"wrong-password-123\"}"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))

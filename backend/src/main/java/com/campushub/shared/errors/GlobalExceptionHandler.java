@@ -10,6 +10,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
@@ -17,6 +18,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.context.request.ServletWebRequest;
@@ -62,6 +65,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleNoResourceFoundException(
             NoResourceFoundException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         return problem(ErrorCode.NOT_FOUND, "No resource exists at this address.", request, null);
+    }
+
+    /** A path ID that is not a UUID is concealed as NOT_FOUND (API_CONTRACT §1); a bad query value is a validation error. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<Object> handleTypeMismatch(MethodArgumentTypeMismatchException ex, WebRequest request) {
+        if (ex.getParameter() != null && ex.getParameter().hasParameterAnnotation(PathVariable.class)) {
+            return problem(ErrorCode.NOT_FOUND, "No resource exists at this address.", request, null);
+        }
+        return problem(ErrorCode.VALIDATION_FAILED, "One or more fields are invalid.", request,
+                List.of(Map.of("field", ex.getName(), "reason", "invalid")));
+    }
+
+    /** The row changed between read and write (API_CONTRACT §1 versioning fields). */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    ResponseEntity<Object> handleStaleVersion(ObjectOptimisticLockingFailureException ex, WebRequest request) {
+        return problem(ErrorCode.STALE_VERSION, "The record changed since it was read. Reload and try again.", request, null);
     }
 
     @ExceptionHandler(DataAccessResourceFailureException.class)

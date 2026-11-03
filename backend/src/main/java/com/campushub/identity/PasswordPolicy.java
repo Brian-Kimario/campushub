@@ -1,5 +1,6 @@
 package com.campushub.identity;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -15,7 +16,12 @@ import java.util.Set;
 public final class PasswordPolicy {
 
     public static final int MIN_LENGTH = 12;
-    public static final int MAX_LENGTH = 128;
+
+    /**
+     * BCrypt reads only the first 72 bytes of its input, so a longer password would silently
+     * ignore its tail. The limit is therefore measured in UTF-8 bytes, not characters.
+     */
+    public static final int MAX_BYTES = 72;
 
     private static final Set<String> COMMON_PASSWORDS = Set.of(
             "password1234",
@@ -41,8 +47,8 @@ public final class PasswordPolicy {
         List<String> reasons = new ArrayList<>();
         if (candidate == null || candidate.length() < MIN_LENGTH) {
             reasons.add("must be at least " + MIN_LENGTH + " characters");
-        } else if (candidate.length() > MAX_LENGTH) {
-            reasons.add("must be at most " + MAX_LENGTH + " characters");
+        } else if (candidate.getBytes(StandardCharsets.UTF_8).length > MAX_BYTES) {
+            reasons.add("must be at most " + MAX_BYTES + " bytes when UTF-8 encoded");
         } else if (COMMON_PASSWORDS.contains(candidate.toLowerCase(Locale.ROOT))) {
             reasons.add("is too common");
         }
