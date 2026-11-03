@@ -6,6 +6,8 @@ import com.campushub.identity.Role;
 import com.campushub.identity.audit.AuditOutcome;
 import com.campushub.identity.audit.AuditService;
 import com.campushub.identity.security.AuthenticatedUser;
+import com.campushub.notifications.NotificationService;
+import com.campushub.notifications.NotificationType;
 import com.campushub.projects.Project;
 import com.campushub.projects.ProjectService;
 import com.campushub.shared.errors.ApiException;
@@ -33,14 +35,16 @@ public class SubmissionService {
     private final ProjectService projects;
     private final AuditService audit;
     private final OutboxService outbox;
+    private final NotificationService notifications;
     private final Clock clock;
 
     public SubmissionService(SubmissionRepository submissions, ProjectService projects, AuditService audit,
-                             OutboxService outbox, Clock clock) {
+                             OutboxService outbox, NotificationService notifications, Clock clock) {
         this.submissions = submissions;
         this.projects = projects;
         this.audit = audit;
         this.outbox = outbox;
+        this.notifications = notifications;
         this.clock = clock;
     }
 
@@ -119,6 +123,10 @@ public class SubmissionService {
         submissions.saveAndFlush(submission);
         String action = body.decision() == ReviewDecision.ACCEPTED ? "submission.accepted" : "submission.changes_requested";
         audit.record(action, caller.userId(), SUBMISSION, id.toString(), AuditOutcome.SUCCESS, request, Map.of());
+        notifications.notify(submission.getSubmittedBy(),
+                body.decision() == ReviewDecision.ACCEPTED ? NotificationType.SUBMISSION_ACCEPTED
+                        : NotificationType.SUBMISSION_CHANGES_REQUESTED,
+                caller.userId(), submission.getProjectId());
         outbox.record(DomainEventType.SUBMISSION_REVIEWED, SUBMISSION, id.toString(), Map.<String, Object>of(
                 "recipientId", submission.getSubmittedBy().toString(),
                 "actorId", caller.userId().toString(),

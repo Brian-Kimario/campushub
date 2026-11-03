@@ -117,6 +117,8 @@ public class NotificationService {
             case INVITATION_ACCEPTED -> actor + " accepted your invitation to " + project + ".";
             case INVITATION_DECLINED -> actor + " declined your invitation to " + project + ".";
             case MEMBER_REMOVED -> "You were removed from " + project + ".";
+            case SUBMISSION_ACCEPTED -> actor + " accepted your submission in " + project + ".";
+            case SUBMISSION_CHANGES_REQUESTED -> actor + " requested changes to your submission in " + project + ".";
         };
     }
 }

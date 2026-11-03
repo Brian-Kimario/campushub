@@ -339,6 +339,31 @@ class SubmissionFlowIntegrationTest {
     }
 
     @Test
+    void reviewDecisionsNotifyTheSubmitterWithTheDecisionType() throws Exception {
+        String ownerToken = tokenFor(account(Role.STUDENT, "Notified Owner"));
+        String projectId = createdProject(ownerToken);
+        String submissionId = createdSubmission(ownerToken, projectId);
+        UserAccount supervisor = account(Role.FACULTY, "Noah Notifier");
+        String supervisorToken = tokenFor(supervisor);
+        mockMvc.perform(supervisorPut(tokenFor(account(Role.ADMIN, "Ada Admin")), projectId, supervisor.getId()))
+                .andExpect(status().isOk());
+        startReview(supervisorToken, submissionId).andExpect(status().isOk());
+
+        decide(supervisorToken, submissionId, "{\"decision\":\"CHANGES_REQUESTED\",\"feedback\":\"Add a summary\"}")
+                .andExpect(status().isCreated());
+        mockMvc.perform(get("/api/v1/notifications").header(AUTHORIZATION, bearer(ownerToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].type").value("SUBMISSION_CHANGES_REQUESTED"))
+                .andExpect(jsonPath("$.content[0].projectId").value(projectId));
+        mockMvc.perform(get("/api/v1/notifications/unread-count").header(AUTHORIZATION, bearer(ownerToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+        mockMvc.perform(get("/api/v1/notifications").header(AUTHORIZATION, bearer(supervisorToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty());
+    }
+
+    @Test
     void acceptedRevisionIsFinalAndCannotBeFollowedByANewRevision() throws Exception {
         String ownerToken = tokenFor(account(Role.STUDENT, "Owner"));
         String projectId = createdProject(ownerToken);
