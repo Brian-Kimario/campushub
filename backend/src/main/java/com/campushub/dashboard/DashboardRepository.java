@@ -1,5 +1,6 @@
 package com.campushub.dashboard;
 
+import com.campushub.identity.Role;
 import com.campushub.projects.Project;
 import com.campushub.projects.ProjectStatus;
 import java.time.LocalDate;
@@ -63,6 +64,21 @@ public interface DashboardRepository extends Repository<Project, UUID> {
             """)
     List<UpcomingTask> upcomingTasksForOwner(@Param("ownerId") UUID ownerId, @Param("today") LocalDate today,
                                              Pageable pageable);
+
+    @Query("""
+            select new com.campushub.dashboard.GroupCount(u.role, count(u))
+            from UserAccount u
+            where u.status = com.campushub.identity.UserStatus.ACTIVE
+            group by u.role
+            """)
+    List<GroupCount<Role>> activeUsersByRole();
+
+    @Query("""
+            select new com.campushub.dashboard.GroupCount(p.status, count(p))
+            from Project p
+            group by p.status
+            """)
+    List<GroupCount<ProjectStatus>> projectsByStatus();
 
     @Query("select count(c) from Certification c where c.ownerId = :ownerId")
     long countCertifications(@Param("ownerId") UUID ownerId);

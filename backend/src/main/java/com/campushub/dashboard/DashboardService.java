@@ -140,6 +140,29 @@ public class DashboardService {
         return status == SubmissionStatus.SUBMITTED || status == SubmissionStatus.UNDER_REVIEW;
     }
 
+    @Transactional(readOnly = true)
+    public AdminDashboardResponse admin(AuthenticatedUser caller) {
+        requireRole(caller, Role.ADMIN);
+
+        Map<Role, Long> usersByRole = new EnumMap<>(Role.class);
+        for (Role role : Role.values()) {
+            usersByRole.put(role, 0L);
+        }
+        for (GroupCount<Role> row : dashboard.activeUsersByRole()) {
+            usersByRole.put(row.key(), row.total());
+        }
+
+        Map<ProjectStatus, Long> projectsByStatus = new EnumMap<>(ProjectStatus.class);
+        for (ProjectStatus status : ProjectStatus.values()) {
+            projectsByStatus.put(status, 0L);
+        }
+        for (GroupCount<ProjectStatus> row : dashboard.projectsByStatus()) {
+            projectsByStatus.put(row.key(), row.total());
+        }
+
+        return new AdminDashboardResponse(usersByRole, projectsByStatus);
+    }
+
     private static void requireRole(AuthenticatedUser caller, Role required) {
         if (caller.role() != required) {
             throw new ApiException(ErrorCode.FORBIDDEN_ROLE, "Your role cannot perform this action.");

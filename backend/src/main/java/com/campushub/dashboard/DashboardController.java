@@ -26,4 +26,9 @@ public class DashboardController {
     public FacultyDashboardResponse faculty(@AuthenticationPrincipal AuthenticatedUser caller) {
         return dashboard.faculty(caller);
     }
+
+    @GetMapping("/admin")
+    public AdminDashboardResponse admin(@AuthenticationPrincipal AuthenticatedUser caller) {
+        return dashboard.admin(caller);
+    }
 }

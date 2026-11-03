@@ -1,5 +1,5 @@
 import { baseApi } from '../../api/baseApi'
-import type { ProjectStatus, TaskStatus } from '../../api/types'
+import type { ProjectStatus, Role, TaskStatus } from '../../api/types'
 
 export interface ProjectProgress {
   id: string
@@ -53,6 +53,11 @@ export interface FacultyDashboard {
   projects: AssignedProject[]
 }
 
+export interface AdminDashboard {
+  activeUsersByRole: Record<Role, number>
+  projectsByStatus: Record<ProjectStatus, number>
+}
+
 export const dashboardApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getStudentDashboard: builder.query<StudentDashboard, void>({
@@ -63,7 +68,15 @@ export const dashboardApi = baseApi.injectEndpoints({
       query: () => ({ url: '/users/me/dashboard/faculty' }),
       providesTags: [{ type: 'Dashboard', id: 'FACULTY' }],
     }),
+    getAdminDashboard: builder.query<AdminDashboard, void>({
+      query: () => ({ url: '/users/me/dashboard/admin' }),
+      providesTags: [{ type: 'Dashboard', id: 'ADMIN' }],
+    }),
   }),
 })
 
-export const { useGetStudentDashboardQuery, useGetFacultyDashboardQuery } = dashboardApi
+export const {
+  useGetStudentDashboardQuery,
+  useGetFacultyDashboardQuery,
+  useGetAdminDashboardQuery,
+} = dashboardApi

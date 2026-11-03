@@ -1,14 +1,22 @@
 import { Link } from 'react-router'
 import { describeError } from '../../api/problem'
 import { useAppSelector } from '../../app/hooks'
-import { formatDate, PROJECT_STATUS_LABELS, TASK_STATUS_LABELS } from '../../components/format'
+import {
+  formatDate,
+  PROJECT_STATUS_LABELS,
+  ROLE_LABELS,
+  TASK_STATUS_LABELS,
+} from '../../components/format'
 import { Badge, EmptyState, ErrorState, PageLoading } from '../../components/ui'
 import {
+  useGetAdminDashboardQuery,
   useGetFacultyDashboardQuery,
   useGetStudentDashboardQuery,
+  type AdminDashboard,
   type FacultyDashboard,
   type StudentDashboard,
 } from './dashboardApi'
+import type { ProjectStatus, Role } from '../../api/types'
 
 export default function DashboardPage() {
   const role = useAppSelector((state) => state.auth.user?.role)
@@ -20,11 +28,7 @@ export default function DashboardPage() {
       </div>
       {role === 'STUDENT' && <StudentOverview />}
       {role === 'FACULTY' && <FacultyOverview />}
-      {role === 'ADMIN' && (
-        <EmptyState title="The dashboard is for students and faculty.">
-          <p>Use Projects to assign supervisors.</p>
-        </EmptyState>
-      )}
+      {role === 'ADMIN' && <AdminOverview />}
     </section>
   )
 }
@@ -173,6 +177,55 @@ function FacultyContent({ data }: { data: FacultyDashboard }) {
             ))}
           </ul>
         )}
+      </section>
+    </>
+  )
+}
+
+function AdminOverview() {
+  const { data, error, isLoading, refetch } = useGetAdminDashboardQuery()
+
+  if (isLoading) return <PageLoading />
+  if (error || !data) {
+    return <ErrorState message={describeError(error).message} onRetry={refetch} />
+  }
+  return <AdminContent data={data} />
+}
+
+const ROLES: Role[] = ['STUDENT', 'FACULTY', 'ADMIN']
+const PROJECT_STATUSES: ProjectStatus[] = ['ACTIVE', 'ARCHIVED']
+
+function AdminContent({ data }: { data: AdminDashboard }) {
+  const users = ROLES.reduce((sum, role) => sum + data.activeUsersByRole[role], 0)
+  const projects = PROJECT_STATUSES.reduce((sum, status) => sum + data.projectsByStatus[status], 0)
+
+  return (
+    <>
+      <div className="stat-grid">
+        <Tile label="Active accounts" value={users} />
+        <Tile label="Projects" value={projects} detail={`${data.projectsByStatus.ACTIVE} active`} />
+      </div>
+
+      <section className="dashboard-block" aria-labelledby="users-by-role">
+        <h2 id="users-by-role">Active accounts by role</h2>
+        <ul className="breakdown">
+          {ROLES.map((role) => (
+            <li key={role}>
+              {ROLE_LABELS[role]}: {data.activeUsersByRole[role]}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="dashboard-block" aria-labelledby="projects-by-status">
+        <h2 id="projects-by-status">Projects by status</h2>
+        <ul className="breakdown">
+          {PROJECT_STATUSES.map((status) => (
+            <li key={status}>
+              {PROJECT_STATUS_LABELS[status]}: {data.projectsByStatus[status]}
+            </li>
+          ))}
+        </ul>
       </section>
     </>
   )
