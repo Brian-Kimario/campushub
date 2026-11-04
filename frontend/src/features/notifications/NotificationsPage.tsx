@@ -49,7 +49,7 @@ export default function NotificationsPage() {
           <p className="muted">Team invitations and membership changes appear here.</p>
         </EmptyState>
       ) : (
-        <ul className="project-list" aria-label="Your notifications">
+        <ul className="notification-list" aria-label="Your notifications">
           {data.content.map((notification) => (
             <NotificationRow
               key={notification.id}
@@ -88,11 +88,12 @@ function NotificationRow({
 }) {
   const isUnread = !notification.readAt
   return (
-    <li className="project-card">
-      <p>
-        <strong>{notification.message}</strong>
+    <li className={isUnread ? 'notification-item is-unread' : 'notification-item'}>
+      <p className={isUnread ? 'notification-message is-unread' : 'notification-message'}>
+        {isUnread && <span className="sr-only">Unread: </span>}
+        {notification.message}
       </p>
-      <p className="muted">
+      <p className="muted notification-time">
         {formatInstant(notification.createdAt)} · {isUnread ? 'Unread' : `Read ${formatInstant(notification.readAt)}`}
       </p>
       <div className="row-actions">

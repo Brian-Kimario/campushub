@@ -65,14 +65,18 @@ export default function ProjectListPage() {
 
       {data && data.content.length > 0 && (
         <>
-          <ul className="project-list">
+          <ul className="project-table" aria-label="Projects">
             {data.content.map((project) => (
-              <li key={project.id} className="project-card">
-                <Link to={`/projects/${project.id}`}>{project.title}</Link>
-                <p className="muted">
-                  {project.subject ?? 'No subject'}
-                  {project.dueDate && ` · Due ${formatDate(project.dueDate)}`}
-                </p>
+              <li key={project.id} className="project-row">
+                <div className="project-row-main">
+                  <Link className="project-row-title" to={`/projects/${project.id}`}>
+                    {project.title}
+                  </Link>
+                  <p className="muted project-row-meta">
+                    {project.subject ?? 'No subject'}
+                    {project.dueDate && ` · Due ${formatDate(project.dueDate)}`}
+                  </p>
+                </div>
                 <Badge tone={project.status === 'ARCHIVED' ? 'warning' : 'success'}>
                   {PROJECT_STATUS_LABELS[project.status as ProjectStatus]}
                 </Badge>
