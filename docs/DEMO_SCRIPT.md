@@ -1,241 +1,190 @@
-# CampusHub — MVP Demonstration Script
+# CampusHub — 8-Minute Demonstration Script
 
-**Purpose:** Run the MVP demonstration end to end in the React UI on a local machine, from startup to the student seeing faculty feedback.
-**Scope:** The MVP only: login and forced password change, project proposal and supervisor assignment, tasks, submissions and revisions, faculty review with feedback, and the student's view of the decision. Profile editing and administrator user management are demonstrated in §7. Everything else in the full plan (calendar, invitations, milestones, audit log UI, file uploads) is out of MVP scope and is not demonstrated.
-**Last reviewed:** 2026-11-03 (MVP Stage 4)
-**Related:** [API_CONTRACT.md](API_CONTRACT.md), [AUTHORIZATION_MATRIX.md](AUTHORIZATION_MATRIX.md), [IMPLEMENTATION_LOG.md](IMPLEMENTATION_LOG.md) §11.
+**Purpose:** Run a live demonstration of CampusHub on the local seeded stack in about eight minutes: sign-in, project work, supervisor assignment, faculty review, notifications, admin user management, and the engineering points behind them.
+**Branch and commit this script was verified against:** `phase-7a-certifications` at `019327a` (Document profile and user administration).
+**Last reviewed:** 2026-11-04 (demo readiness check)
+**Related:** [API_CONTRACT.md](API_CONTRACT.md), [AUTHORIZATION_MATRIX.md](AUTHORIZATION_MATRIX.md), [CI_CD.md](CI_CD.md), [CHANGELOG.md](CHANGELOG.md).
 
-## 1. Software and versions
+## 0. Disclosure: deferred features
 
-| Component | Version or setting |
-|---|---|
-| Java | 21 (the Maven wrapper in `backend/` is used, so no local Maven install is needed) |
-| Spring Boot | 3.5.16 |
-| MySQL | 8.4, from the `mysql:8.4` image pinned in `docker-compose.yml` |
-| Node.js | 20 or later, with npm |
-| React | 19, Vite 8, Redux Toolkit with RTK Query, React Router, React Hook Form with Zod 4 |
-| Docker | Docker Desktop or Docker Engine with Compose v2 |
+These are **not** part of this demo and must be stated if asked:
 
-API routes are served under `/api/v1`. The frontend calls `/api/v1` through the Vite dev proxy, which forwards to `http://localhost:8080` by default.
+- **2C — Project lifecycle.** A project is created `ACTIVE` immediately. The `DRAFT` → approval → `ACTIVE` flow is not implemented.
+- **2D — Milestone-linked submissions.** Submissions are not linked to milestones.
 
-## 2. Setup (once)
+Also not in this demo: file upload and evidence download (not exercised in the final check), invitations, calendar editing (the calendar view is shown only), and an audit log page in the UI (the audit log is reachable through the API only; see §4).
 
-1. Create a local `.env` in the repository root from `.env.example`. Set the database and JWT values, and for demo use set:
-   - `CAMPUSHUB_DEV_SEED_ENABLED=true`
-   - `CAMPUSHUB_DEV_SEED_PASSWORD` to a local password of your choice.
+## 1. Before the demo (checklist)
 
-   `.env` is gitignored. Do not commit it, and do not copy its values into any document.
-2. Start the database and API:
+1. Start the database and API (`.env` is created from `.env.example`, with `CAMPUSHUB_DEV_SEED_ENABLED=true` and `CAMPUSHUB_DEV_SEED_PASSWORD` set to the local seed password):
 
    ```bash
    docker compose up -d --build
    ```
 
-3. Confirm readiness. The response should show `UP`:
+2. Confirm readiness. The response must show `"status":"UP"`:
 
    ```bash
    curl -s http://localhost:8080/actuator/health/readiness
    ```
 
-4. Start the frontend dev server in a second terminal:
+3. Start the frontend in a second terminal:
 
    ```bash
    cd frontend && npm install && npm run dev
    ```
 
-5. Open `http://localhost:5173/login` in the browser.
+4. Open the app at **http://localhost:5173/login**.
+5. Use a private window for each role, or sign out between roles. The access token lives in memory; a reload restores the session from the HttpOnly refresh cookie.
 
-### Demo accounts
-
-The seeder creates one account per role. Names only; the password is the value you set in `CAMPUSHUB_DEV_SEED_PASSWORD`.
+Demo accounts (all verified to sign in on 2026-11-04). The password is the value of `CAMPUSHUB_DEV_SEED_PASSWORD` from your local `.env`. It is for local development only and must never be deployed publicly.
 
 | Email | Role | Used in |
 |---|---|---|
-| `admin@campushub.local` | ADMIN | Supervisor assignment (step 3.3) |
-| `faculty@campushub.local` | FACULTY | Review and feedback (step 3.4) |
-| `student@campushub.local` | STUDENT | Project, task, submission (steps 3.1, 3.2, 3.5) |
-| `student2@campushub.local` | STUDENT | Negative checks (step 3.6) |
+| `student@campushub.local` | STUDENT | Minutes 1–2, 4 |
+| `admin@campushub.local` | ADMIN | Minutes 2, 5 |
+| `faculty@campushub.local` | FACULTY | Minutes 3 |
+| `student2@campushub.local` | STUDENT | Optional negative check (§6) |
 
-The seeder skips accounts that already exist, so changing `CAMPUSHUB_DEV_SEED_PASSWORD` later does not change a password that is already stored. To reset a demo password, use the admin account's user management, or reset the local database (see §5).
+## 2. The 8-minute sequence
 
-Use one browser profile for one role at a time, or use a private window per role. The access token is held in memory only. A reload restores the session from the HttpOnly refresh cookie (ADR-025). Signing out ends the session on the server and clears the cookie.
+Check each expected result before moving on. If a result differs, say so and continue; do not change the expected value on the spot.
 
-## 3. Script
+| Time | Who (URL) | Action | Expected result |
+|---|---|---|---|
+| 0:00–0:45 | Terminal | Run the readiness `curl` from §1. Show the login page. | `status` is `UP`. The login form appears. |
+| 0:45–2:00 | **Student** `/login` | Sign in as `student@campushub.local`. Go to **Projects** → **New project**. Enter a title, such as "Live demo project", and save. Open it and add a task, "Write demo outline", with priority High. Move the task to In progress. | The project appears as `ACTIVE`. The task appears as `TODO`, then `IN_PROGRESS`. |
+| 2:00–2:40 | **Student** (same session) | On the project, create a submission: "Revision 1: Demo outline draft", with a link beginning `https://`. | The revision shows `SUBMITTED`. A link that starts with `http://` is refused by validation. |
+| 2:40–3:20 | **Admin** `/login` (sign out the student first) | Sign in as `admin@campushub.local`. Open the new project and assign **Dev Faculty** as supervisor. | "Dev Faculty" appears as Supervisor. The admin has the **Users** navigation item. |
+| 3:20–4:20 | **Faculty** `/login` (sign out the admin first) | Sign in as `faculty@campushub.local`. On **Dashboard**, the supervised project shows "1 awaiting review". Open the project → **Start review**. Leave Feedback empty and try **Save decision** with "Request changes". Then enter feedback and save. | The empty feedback is refused (`FEEDBACK_REQUIRED`). After saving, the revision shows "Changes requested" with the feedback text. |
+| 4:20–5:00 | **Student** (sign out faculty first) | Open **Notifications**. | "Dev Faculty requested changes to your submission in …" is listed as unread, with the time. The nav shows an unread badge. |
+| 5:00–6:10 | **Admin** `/admin/users` | In **Create an account**, enter a disposable email such as `demo.live@campushub.local`, a name, and role Student. Create it. Note the one-time temporary password. Then select **Reset password** for that account. Then **Deactivate**, and then **Reactivate**. On the admin's own row, note that Deactivate is disabled ("You cannot deactivate your own account"). | The new account shows "must change password". Each action is confirmed in the directory. The one-time password is shown once. Your own row cannot be deactivated. |
+| 6:10–6:50 | **Access control** (sign in as faculty, or as the student if time allows) | Open `http://localhost:5173/admin/users`. | The page shows "Administrators only" and the user directory does not load. The API also refuses this with 403 (§3). |
+| 6:50–7:40 | **Terminal** | Run the API commands in §3: log in, call the audit search, and show the admin actions from the last five minutes. Then show the CI checks for `019327a` (§4). | Login returns a token. The audit search lists `admin.user.created`, `admin.user.deactivated`, `admin.user.reactivated`, and `admin.user.password_reset`. |
+| 7:40–8:00 | Close | State what was shown, the deferred items (§0), and the known limitations (§5). | — |
 
-Each step gives the action in the UI and the expected result. Check each result before moving on.
+## 3. JWT and role-based access, shown through the API
 
-### 3.1 Student: sign in, create a project and a task
+Set the local seed password once in your terminal. Do not paste it into chat or documents.
 
-1. Sign in as `student@campushub.local`.
-   - Expected: the project list loads. It may be empty.
-2. Create a project with a title and description. Save.
-   - Expected: the project appears in the list with status `ACTIVE`.
-3. Open the project. Create a task with a title, and optionally a due date.
-   - Expected: the task appears with status `TODO`.
-4. Move the task to `IN_PROGRESS`.
-   - Expected: the status changes. Transitions not allowed from the current state are not offered.
+```bash
+export CAMPUSHUB_DEV_SEED_PASSWORD='<your local seed password>'
+```
 
-### 3.2 Student: submit a revision
+Log in as the administrator. The response carries an `accessToken` (short-lived bearer JWT). The refresh token is set as an HttpOnly cookie, `campushub_refresh`, which the browser sends only to `/api/v1/auth`.
 
-1. On the project, open the submissions panel. Create a submission (revision 1) with a summary.
-   - Expected: revision 1 appears with status `SUBMITTED`.
+```bash
+ADMIN_TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
+  -H 'Content-Type: application/json' -H 'X-Requested-With: CampusHub' \
+  -d "{\"email\":\"admin@campushub.local\",\"password\":\"$CAMPUSHUB_DEV_SEED_PASSWORD\"}" \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["accessToken"])')
+```
 
-Do not show a sealed-version or file-upload step in the MVP. File upload is not in the MVP.
+Show the admin-only audit search, which is an API endpoint with no UI page:
 
-### 3.3 Administrator: assign a supervisor
+```bash
+curl -s "http://localhost:8080/api/v1/admin/audit-events?size=5" \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+```
 
-1. Sign out. Sign in as `admin@campushub.local`.
-   - Expected: admin navigation only. Student task creation is not offered.
-2. Open the student's project. Assign `Dev Faculty` as supervisor.
-   - Expected: the supervisor name appears on the project.
-3. Sign out.
+Show the role rule. Log in as the student the same way (`student@campushub.local`), storing the token in `STUDENT_TOKEN`, and call the admin endpoint with it. Expected: HTTP 403 (verified over HTTP on 2026-11-04; the same call as admin returns 200).
 
-### 3.4 Faculty: review with feedback
+```bash
+STUDENT_TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
+  -H 'Content-Type: application/json' -H 'X-Requested-With: CampusHub' \
+  -d "{\"email\":\"student@campushub.local\",\"password\":\"$CAMPUSHUB_DEV_SEED_PASSWORD\"}" \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["accessToken"])')
+curl -s -o /dev/null -w '%{http_code}\n' "http://localhost:8080/api/v1/admin/audit-events" \
+  -H "Authorization: Bearer $STUDENT_TOKEN"
+```
 
-1. Sign in as `faculty@campushub.local`.
-   - Expected: the supervised project appears in the list.
-2. Open the project and the submission. Start the review.
-   - Expected: the review starts for revision 1.
-3. Try to request changes with an empty feedback field.
-   - Expected: the request is refused. The message names the feedback requirement (`FEEDBACK_REQUIRED`).
-4. Enter feedback and request changes.
-   - Expected: the decision is `CHANGES_REQUESTED`. A second decision on the same revision is refused.
-5. Sign out.
+What to say: the server enforces the role on every `/api/v1/admin/**` route (`SecurityConfig`). The UI hides navigation, but the API check is what protects the data. A token issued before a user is deactivated or has a password reset is refused, because `AuthenticationFilter` compares the token's issue time against the account's revocation time.
 
-### 3.5 Student: see the feedback and revise
+## 4. Engineering points: how to demonstrate each
 
-1. Sign in as `student@campushub.local`.
-   - Expected: the project shows `Changes requested` and the faculty feedback text.
-2. Create revision 2 with a new summary and submit.
-   - Expected: revision 2 is created. Revision 1 stays visible in the history.
-3. Sign out. Sign in as faculty. Start the review of revision 2 and record `ACCEPTED`, with feedback if the form requires it.
-   - Expected: revision 2 is accepted; the decision is recorded once. (Not yet verified in the browser; see §4.)
-4. Sign in as the student again.
-   - Expected: the project shows the accepted decision and both revisions. (Not yet verified in the browser; see §4.)
+| Topic | What to show | What to say |
+|---|---|---|
+| **REST APIs** | The `curl` calls in §3. The API contract at [API_CONTRACT.md](API_CONTRACT.md). | All routes are under `/api/v1`. Errors use RFC 9457 problem responses with an `errorCode` such as `FEEDBACK_REQUIRED`. Lists use one paging shape: `content`, `page`, `totalPages`, `sort`. |
+| **JWT and RBAC** | The student-to-admin 403 in §3. The "Administrators only" page in minute 6. | Stateless bearer JWT. Roles are `STUDENT`, `FACULTY`, `ADMIN`. Route-level checks plus per-resource checks (for example, only the supervisor can review). Refresh and logout also require the `X-Requested-With` header (CSRF defence). |
+| **MySQL** | The stack is running MySQL 8.4 in Docker. Flyway migrations run on startup (18 in total). | Schema changes are versioned migrations. Applied migrations are never edited. Optimistic locking (`@Version`) protects concurrent edits. Hibernate validates the schema and does not generate it. |
+| **Kafka (optional)** | Explain only. Do not claim it is running unless you started it. Optional start: `docker compose --profile kafka up -d`, with `CAMPUSHUB_KAFKA_ENABLED=true`. | Kafka is an optional event broker, **off by default** (ADR-011). Notifications in this demo are database rows that the browser polls once a minute, not pushed events. The transactional outbox that would publish them to Kafka is deferred. Kafka was not exercised in the final verification. |
+| **CI/CD** | GitHub Actions run `41757115852` for commit `019327a` (see below). | CI runs the backend `mvnw verify` (including Testcontainers MySQL tests), the frontend typecheck, build and lint, and an API image build that does not push. Deployment is not automated and was not performed. |
 
-### 3.6 Negative checks (optional, when time allows)
+CI results for `019327a` (run 41757115852, checked 2026-11-04):
 
-These checks confirm the authorization rules in the UI. Each one should be refused or hidden.
+| Check | Result |
+|---|---|
+| backend (`mvnw verify`) | pass (9m 8s) |
+| frontend (typecheck, build, lint) | pass (10s) |
+| api image (build only, no push) | pass (1m 54s) |
+| GitGuardian Security Checks | **fail** (see §5) |
 
-1. Sign in as `student2@campushub.local`. Open the first student's project by its URL.
-   - Expected: not found or access denied. The project data is not shown.
-2. Sign in as the student. Try to open the admin user area.
-   - Expected: no admin navigation. A direct URL redirects or shows not found.
-3. Sign in as the student. Try to create a task on a project that is not theirs.
-   - Expected: not found.
+## 5. Known limitations
 
-If a check returns an unexpected result, say so. Do not change the expected value during the demonstration. Refer to the test that covers it in the backend suite.
+- **GitGuardian check fails.** It flags one Generic Password finding at `backend/src/test/java/com/campushub/identity/PasswordPolicyTest.java:31`, which is the deliberately short test input `"Test@12"` (introduced in commit `b3cad32`). It is not a live credential. The finding is not dismissed in this repository; it needs a decision in the GitGuardian dashboard. Say this plainly if asked.
+- **2C and 2D are deferred** (§0).
+- No file upload or evidence download was exercised in the final check.
+- Accepting a second revision and the student seeing that decision was not run in the browser; the backend rules are covered by tests.
+- Audit search has no UI page; it is API only.
+- The admin area has no statistics dashboard. Admin role changes are refused (`ROLE_CHANGE_NOT_SUPPORTED`), and a department cannot be cleared through the admin form.
+- The task list returns at most 50 tasks per project, and there are no pagination controls in the UI.
+- Notifications are polled, not pushed.
+- Mobile layout was checked only on `/projects` at 375 px (no horizontal scroll). Other pages were not checked at that width.
 
-### 3.7 Password change (optional)
+## 6. Optional extended checks (only if time allows)
 
-The seeded accounts do not require a password change. Use this step with an account that has `mustChangePassword` set, or with the student account after the change is made.
+These are not part of the 8-minute run.
 
-1. Open `/change-password` while signed in. Enter the current password and a new one of 8 to 72 bytes.
-   - Expected: the change succeeds.
-2. Sign out. Sign in with the old password, then with the new one.
-   - Expected: the old password is refused with the generic message; the new one works.
-3. Restore the original password with the same steps, so the demo accounts stay usable.
+1. **Cross-user access.** Sign in as `student2@campushub.local` and open the first student's project URL. Expected: not found or access denied.
+2. **Password change.** Open `/change-password`, change the password, sign out, and sign in with the old password (refused) and the new one (accepted). Restore the original password afterwards so the demo accounts stay usable.
+3. **Skills catalog.** As admin, open `/skills` and add a skill. Adding the same name with different case shows "A skill with this name already exists."
+4. **Certifications.** As student, open `/certifications`. An expiry date before the issue date, or a link starting with `http://`, is refused before saving.
+5. **Dashboards.** Student `/dashboard` shows counts and task progress. Faculty `/dashboard` shows only supervised projects.
 
-### 3.8 Skills (Phase 5B)
-
-1. Sign in as the administrator and open `/skills`. Add a skill, for example `Java` in `Programming`.
-   - Expected: it appears in the catalog. Adding `JAVA` or `  java ` again shows "A skill with this name already exists."
-2. Sign in as the student and open `/skills`. Add `Java` to "My skills", set the proficiency to Intermediate, add a short evidence note, and save.
-   - Expected: "Your skills are saved." After a reload the same values appear.
-3. Check the administrator and faculty views of `/skills`.
-   - Expected: no "My skills" editor. The catalog is visible to both, and the add form appears only for the administrator.
-
-### 3.9 Certifications (Phase 7a)
-
-1. Sign in as the student and open `/certifications`. Add a certification: a title, an issuer, an issue date, an optional expiry date, an optional credential ID, and a credential link starting with `https://`.
-   - Expected: it appears in "My certifications" with the issue date, the expiry date, the credential ID, and a "View credential" link.
-2. Enter an expiry date earlier than the issue date and submit.
-   - Expected: the form refuses it and names the date rule. Nothing is saved.
-3. Enter a credential link that starts with `http://` and submit.
-   - Expected: the form refuses it and names the `https://` rule. Nothing is saved.
-4. Edit the certification: change the issuer or the expiry date and save. Reload the page.
-   - Expected: the changes persist after the reload. If another session saved the same certification first, the save is refused with "This certification changed. Reload it and try again."
-5. Delete the certification and confirm.
-   - Expected: the list is empty again.
-6. Sign in as the administrator or faculty.
-   - Expected: no "Certifications" navigation. The page shows that only students keep certifications.
-
-Evidence file upload is not part of this phase.
-
-### 3.10 Dashboards (Phase 10)
-
-1. Sign in as the student and open `/dashboard`.
-   - Expected: project, task, submission, skill, and certification counts. The task progress is a percentage of DONE tasks over all tasks, or "No tasks yet" when there are none. It never shows 100% for an empty project.
-2. Sign in as faculty and open `/dashboard`.
-   - Expected: only the projects this faculty member supervises, with the number of revisions awaiting review. Projects supervised by someone else do not appear.
-3. Sign in as the administrator.
-   - Expected: no "Dashboard" navigation. The page says the dashboard is for students and faculty.
-
-## 4. Verification status
-
-What was checked, and how. Anything not listed as verified was not demonstrated end to end in the browser.
+## 7. Verification status (as of 2026-11-04)
 
 | Area | Status | Evidence |
 |---|---|---|
-| `/api/v1` routing and auth | Verified | `./mvnw -B verify`, 125 tests, 0 failures, BUILD SUCCESS (Phases 9.1 and 10 included) |
-| Certification create with expiry date and credential ID; edit persists after reload; stale-version and expiry-before-issue refusals | Verified in browser for create and edit-after-reload. Refusals covered by `CertificationFlowIntegrationTest` (12 tests) | Built-in browser on `localhost:5173` as `student2`; dashboard certification count reads 1 from MySQL |
-| Student dashboard (empty state and certification count) | Verified in browser | Built-in browser; progress with tasks covered by `DashboardIntegrationTest` (5 tests) |
-| Faculty dashboard (supervised projects only, awaiting-review counts) | Verified in browser | Built-in browser as `faculty@campushub.local`: 2 supervised projects, 1 awaiting review each |
-| Student dashboard task progress with real tasks, admin dashboard message | Not verified in browser | Backend tests cover progress and role rules; the admin message is not checked in the UI |
-| Login (correct and wrong password), empty-field validation, `/projects` redirect without session | Verified in browser | Built-in browser pane |
-| Student project create, task create, transition to `IN_PROGRESS`, revision 1 and 2 submit | Verified in browser | Built-in browser pane |
-| Admin supervisor assignment | Verified in browser | Built-in browser pane |
-| Faculty review start, changes requested with feedback, student sees feedback | Verified in browser | Built-in browser pane |
-| Password change through the UI (old rejected, new accepted) | Verified in browser | Built-in browser pane; original password restored afterwards |
-| Session restored on reload; sign-out ends it | Verified in browser | Reload stays on `/projects` (refresh returns 200). Sign-out returns 204 on the first click, lands on `/login`, and the next visit to `/projects` redirects to login (refresh returns 401) |
-| Faculty accepts revision 2 and the student sees the accepted decision | Not verified in browser | Backend decision rules covered by `SubmissionFlowIntegrationTest` |
-| Student attempts admin actions and cross-user access in the UI | Not verified in browser | Covered by backend tests only |
-| Task transitions beyond `IN_PROGRESS` (`BLOCKED`, `DONE`, archive) | Not verified in browser | Covered by backend tests (`TaskFlowIntegrationTest`) |
-| Block and reset flows | Not verified in browser | — |
-| Project archive from the UI | Not verified in browser | Backend endpoint exists |
-| Pagination past the first page (50-task limit) | Not verified | No pagination controls in the UI |
+| Sign-in for all four demo accounts | Verified in browser | Each account signed in and reached its landing page |
+| Student project create, task create and transition, submission create | Verified in browser | Project `Demo Golden Path Project`, task `Write demo outline`, revision 1 `SUBMITTED` |
+| Admin supervisor assignment | Verified in browser | Supervisor shows "Dev Faculty" |
+| Faculty dashboard (supervised projects, awaiting-review count) | Verified in browser | Shows "1 awaiting review" on the golden path project |
+| Faculty review: empty feedback refused; request changes with feedback saved | Verified in browser | Revision shows "Changes requested" with the feedback text |
+| Student notifications for the decision | Verified in browser | Unread notification "Dev Faculty requested changes to your submission…" |
+| Admin: create account, must-change-password flag | Verified in browser | Account created; row shows "must change password" |
+| Admin: reset password (one-time temporary password) | Verified in browser | Temporary password shown once; audit event `admin.user.password_reset` present |
+| Admin: deactivate and reactivate | Verified in browser | Status moved Active → Deactivated → Active; audit events present |
+| Admin: own-row deactivate disabled | Verified in browser | Button reads "You cannot deactivate your own account" |
+| Non-admin blocked from `/admin/users` | Verified in browser (faculty) and over HTTP (student) | Page shows "Administrators only"; `GET /api/v1/admin/audit-events` returns 403 for the student and 200 for the admin |
+| Audit search `GET /api/v1/admin/audit-events` with action filter | Verified over HTTP | Returns the admin actions; `action=admin.user.password_reset` filter returns one row |
+| Profile page loads | Verified in browser | Admin profile page renders |
+| Calendar page loads | Verified in browser | Month view renders, with the empty-day message |
+| Mobile layout at 375 px (`/projects`) | Verified in browser | No horizontal overflow (scrollWidth equals clientWidth) |
+| CI for `019327a` (backend, frontend, image build) | Verified on GitHub | Run 41757115852: all pass except GitGuardian |
+| Evidence file download | Not verified | Requires an uploaded file; not run |
+| Faculty accepts a second revision; student sees it | Not verified in browser | Backend rules covered by `SubmissionFlowIntegrationTest` |
+| Invitations and collaboration in the UI | Not verified in browser | Covered by backend tests |
+| Mobile layout on pages other than `/projects` | Not verified | — |
+| Kafka path | Not verified | Off by default; not exercised |
 
-## 5. Troubleshooting
+## 8. Troubleshooting
 
 | Symptom | Cause and fix |
 |---|---|
-| Login returns 404 for `/auth/login` | The container on port 8080 is an old build without the `/api/v1` prefix. Rebuild with `docker compose up -d --build api`. Do not remove volumes. |
-| Login returns 401 for every account | The seed password does not match. Check `CAMPUSHUB_DEV_SEED_PASSWORD` in `.env`, or reset the demo password through admin user management. |
-| Readiness is `DOWN` | Check `docker compose logs api`. A missing storage path causes a `DOWN` status locally; the Compose volume provides `/var/campushub/storage`. |
-| Frontend calls fail with a network error | The API is not running on the port the proxy targets. Set `CAMPUSHUB_API_TARGET` before `npm run dev` if the API is on another port. |
-| Page reload shows the login screen | The refresh cookie is missing or expired (8-hour limit). Sign in again. If the browser refuses the Secure cookie over plain HTTP, set `campushub.refresh.cookie-secure=false` for that local run only. |
-| Startup refuses the seed | `CAMPUSHUB_DEV_SEED_ENABLED=true` requires `CAMPUSHUB_DEV_SEED_PASSWORD` to be set. |
+| Login returns 404 for `/api/v1/auth/login` | The container on port 8080 is an old build. Rebuild with `docker compose up -d --build api`. Do not remove volumes. |
+| Login returns 401 for every account | The seed password does not match `CAMPUSHUB_DEV_SEED_PASSWORD`. The seeder skips accounts that already exist, so a changed value does not change a stored password. Reset it through admin user management. |
+| Readiness is `DOWN` | Check `docker compose logs api`. |
+| Frontend calls fail with a network error | The API is not on the port the Vite proxy targets (`http://localhost:8080`). Set `CAMPUSHUB_API_TARGET` before `npm run dev`. |
+| Reload shows the login screen | The refresh cookie is missing or expired (8-hour limit). Sign in again. |
+| Startup refuses the seed | `CAMPUSHUB_DEV_SEED_ENABLED=true` requires `CAMPUSHUB_DEV_SEED_PASSWORD`. |
 
-Reset the local database only if you accept losing its data. The command below removes the volumes and is not part of the normal demo:
+Do not run `docker compose down -v` before the demo. It deletes the local database volume.
 
-```bash
-docker compose down -v
-```
+## 9. Appendix: profile and user administration (detail)
 
-## 6. Known limitations
+Use this appendix only if asked for more detail on the profile and user administration flow. The 8-minute run in §2 covers it.
 
-- The MVP has no file upload, calendar, invitations, milestones, or audit log UI. These are out of MVP scope.
-- The task list returns at most 50 tasks per project, and the UI has no pagination controls.
-- The break-glass path for administrators to read a private submission is deferred (ADR-007), so the admin account cannot open a student's submission files.
-- The intermittent sign-out failure seen earlier (needing a second click) did not recur in the final browser check, but it was not stress-tested. The refresh-cookie fix addresses its likely cause (an expired access token blocking `/auth/logout`), which is covered by a backend test.
-- The compose API port (8080) must not be used by another process during the demo.
-- Project lifecycle (a DRAFT project awaiting approval before it becomes ACTIVE) is not implemented. Projects are created ACTIVE. Milestone-linked submissions are not implemented either.
-- An administrator cannot change a user's role (the API returns `ROLE_CHANGE_NOT_SUPPORTED`) or clear a department through the admin form. Both are deliberate MVP limits.
-
-## 7. Profile and user administration
-
-Steps for about two minutes. Use the seeded accounts from §2 unless noted.
-
-**7.1 Student edits a profile.** Sign in as `student@campushub.local`, open **Profile**, change the display name, pick a department, and fill in program, cohort, and bio. Select **Save**. The page shows "Profile saved." Reload the page: the values persist. The email, institutional ID, and role are shown read-only, because the API does not accept changes to them.
-
-**7.2 Administrator creates an account.** Sign in as `admin@campushub.local` and open **Users**. Under **Create an account**, enter a new email (for example `demo.new@campushub.local`), a display name, and the role Student. Select **Create account**. A temporary password appears once in the panel above the directory. Copy it before dismissing the panel.
-
-**7.3 Filter and search.** In **Directory**, set Role to Student, then search for `demo`. The new account is listed. Its password is never shown in the list.
-
-**7.4 Reset the password.** Select **Reset password for** the new account and confirm. A new temporary password appears. The account is marked "must change password".
-
-**7.5 Deactivate and reactivate.** Select **Deactivate** on the account and confirm. Sign in as that account in a private window: the sign-in is refused. Back as admin, select **Reactivate**. The account can sign in again.
-
-**7.6 Self-protection.** On the admin's own row, the **Deactivate** button is disabled. The API also refuses the request with `PRECONDITION_NOT_MET` if it is sent directly.
-
-**7.7 Role change is refused.** Send `PATCH /api/v1/admin/users/{id}` with `{"role":"ADMIN"}` as the admin. The response is 422 `ROLE_CHANGE_NOT_SUPPORTED`, and the role is unchanged.
+- **Student edits a profile.** Sign in as the student, open **Profile**, change the display name and other fields, and save. The page shows "Profile saved." The email, institutional ID, and role are read-only; the API refuses changes to them with `FIELD_NOT_EDITABLE`.
+- **Filter and search.** In **Directory**, set Role to Student and search for `demo`. The password is never shown in the list.
+- **Deactivated sign-in.** Sign in as a deactivated account in a private window: the sign-in is refused. Reactivate it as admin, and it signs in again.
+- **Role change refused.** `PATCH /api/v1/admin/users/{id}` with `{"role":"ADMIN"}` returns 422 `ROLE_CHANGE_NOT_SUPPORTED`, and the role is unchanged.
