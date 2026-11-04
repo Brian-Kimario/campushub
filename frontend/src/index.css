@@ -763,8 +763,10 @@ select[aria-invalid='true'] {
   padding-right: 0;
 }
 
+/* Positioned so the sr-only labels inside the table stay clipped here instead of widening the page. */
 .table-scroll {
   overflow-x: auto;
+  position: relative;
 }
 
 /* Row actions read as text links so a long table stays scannable; the danger action keeps its color. */
