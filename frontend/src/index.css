@@ -745,8 +745,9 @@ select[aria-invalid='true'] {
   vertical-align: middle;
 }
 
-/* Long addresses wrap instead of forcing the table wider than the workspace. */
+/* A minimum width keeps an address to a few lines; the table wrapper scrolls past that instead of stacking characters. */
 .admin-users td:nth-child(2) {
+  min-width: 13rem;
   overflow-wrap: anywhere;
 }
 
