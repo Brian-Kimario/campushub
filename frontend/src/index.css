@@ -629,10 +629,12 @@ select[aria-invalid='true'] {
 
 .calendar-day-count {
   margin-top: auto;
-  padding: 0 0.375rem;
+  padding: 0 0.4rem;
   border-radius: 999px;
-  background: var(--accent-soft, #dbeafe);
+  background: var(--accent-soft);
+  color: var(--accent);
   font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .calendar-details {
@@ -846,6 +848,33 @@ select[aria-invalid='true'] {
 .project-row-meta {
   margin: 0;
   font-size: 0.875rem;
+}
+
+/* Skills read as a ruled list like the project index, not as bare browser bullets. */
+.skill-list,
+.own-skill-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border-strong);
+}
+
+.skill-list li,
+.own-skill-list li {
+  padding: 0.75rem 0.25rem 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.skill-list,
+.own-skill-list {
+  margin-top: 0.5rem;
+}
+
+/* The add form sits below the record, separated by a rule rather than a card. */
+.add-certification {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
 }
 
 /* Notifications: unread rows carry a bold weight, an accent rule and a dot; read rows recede. */
