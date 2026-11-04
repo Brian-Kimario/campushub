@@ -77,16 +77,23 @@ export default function ProjectDetailPage() {
         </section>
       )}
 
-      <MilestonePanel project={project} isOwner={isOwner} isSupervisor={isSupervisor} />
-      <TaskPanel project={project} isOwner={isOwner} />
-      <TeamPanel project={project} isOwner={isOwner} />
-      <SubmissionPanel
-        project={project}
-        isOwner={isOwner}
-        isSupervisor={isSupervisor}
-        evidenceAccess={user?.role === 'STUDENT' ? 'upload' : user?.role === 'ADMIN' ? 'none' : 'view'}
-      />
-      {user?.role === 'ADMIN' && <ProjectAdminPanel project={project} onReload={() => void refetch()} />}
+      {/* Work (milestones, tasks, submissions) reads down the main column; people and admin sit beside it on wide screens. */}
+      <div className="project-workspace">
+        <div className="project-column project-main">
+          <MilestonePanel project={project} isOwner={isOwner} isSupervisor={isSupervisor} />
+          <TaskPanel project={project} isOwner={isOwner} />
+          <SubmissionPanel
+            project={project}
+            isOwner={isOwner}
+            isSupervisor={isSupervisor}
+            evidenceAccess={user?.role === 'STUDENT' ? 'upload' : user?.role === 'ADMIN' ? 'none' : 'view'}
+          />
+        </div>
+        <div className="project-column project-side">
+          <TeamPanel project={project} isOwner={isOwner} />
+          {user?.role === 'ADMIN' && <ProjectAdminPanel project={project} onReload={() => void refetch()} />}
+        </div>
+      </div>
     </article>
   )
 }

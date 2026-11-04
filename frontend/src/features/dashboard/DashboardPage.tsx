@@ -13,6 +13,7 @@ import {
   useGetFacultyDashboardQuery,
   useGetStudentDashboardQuery,
   type AdminDashboard,
+  type AssignedProject,
   type FacultyDashboard,
   type StudentDashboard,
 } from './dashboardApi'
@@ -33,13 +34,18 @@ export default function DashboardPage() {
   )
 }
 
-function Tile({ label, value, detail }: { label: string; value: string | number; detail?: string }) {
+function plural(count: number, word: string) {
+  return `${count} ${word}${count === 1 ? '' : 's'}`
+}
+
+// One line of figures under the heading. Numbers read as a sentence, not as a grid of equal boxes.
+function SummaryLine({ items }: { items: string[] }) {
   return (
-    <div className="stat-tile">
-      <span className="stat-label">{label}</span>
-      <span className="stat-value">{value}</span>
-      {detail && <span className="muted">{detail}</span>}
-    </div>
+    <ul className="summary-line" aria-label="Summary">
+      {items.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ul>
   )
 }
 
@@ -72,19 +78,69 @@ function StudentOverview() {
   return <StudentContent data={data} />
 }
 
+// Students need to know what is due next, so deadlines lead. Progress and project status follow.
 function StudentContent({ data }: { data: StudentDashboard }) {
+  const hasProjects = data.projectsTotal > 0
+
   return (
     <>
-      <div className="stat-grid">
-        <Tile label="Projects" value={data.projectsTotal} detail={`${data.projectsActive} active`} />
-        <Tile label="Tasks" value={data.tasksTotal} detail={`${data.tasksDone} done`} />
-        <Tile label="Submissions" value={data.submissionsTotal} detail={`${data.submissionsAwaitingReview} awaiting review`} />
-        <Tile label="Skills" value={data.skillsCount} />
-        <Tile label="Certifications" value={data.certificationsCount} />
-      </div>
+      <SummaryLine
+        items={[
+          `${data.projectsActive} of ${plural(data.projectsTotal, 'project')} active`,
+          `${data.tasksDone} of ${plural(data.tasksTotal, 'task')} done`,
+          `${plural(data.submissionsAwaitingReview, 'submission')} awaiting review`,
+        ]}
+      />
 
-      <section className="dashboard-block" aria-labelledby="task-breakdown">
-        <h2 id="task-breakdown">Task progress</h2>
+      <section className="dashboard-section" aria-labelledby="upcoming-tasks">
+        <h2 id="upcoming-tasks">Next deadlines</h2>
+        {data.upcomingTasks.length === 0 ? (
+          <p className="muted">No open tasks have a due date.</p>
+        ) : (
+          <ul className="deadline-list">
+            {data.upcomingTasks.map((task) => (
+              <li key={task.id}>
+                <span className="deadline-date">{formatDate(task.dueDate)}</span>
+                <span className="deadline-main">
+                  <Link to={`/projects/${task.projectId}`}>{task.title}</Link>
+                  <span className="muted">{TASK_STATUS_LABELS[task.status]}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="dashboard-section" aria-labelledby="recent-projects">
+        <h2 id="recent-projects">Your projects</h2>
+        {!hasProjects ? (
+          <EmptyState title="No projects yet">
+            <p className="muted">Propose a project to start tracking tasks and deadlines.</p>
+            <div className="actions">
+              <Link className="button-link primary" to="/projects/new">
+                Propose a project
+              </Link>
+            </div>
+          </EmptyState>
+        ) : (
+          <ul className="project-progress-list">
+            {data.recentProjects.map((project) => (
+              <li key={project.id}>
+                <div className="project-progress-head">
+                  <Link to={`/projects/${project.id}`}>{project.title}</Link>
+                  <Badge tone={project.status === 'ARCHIVED' ? 'warning' : 'success'}>
+                    {PROJECT_STATUS_LABELS[project.status]}
+                  </Badge>
+                </div>
+                <ProgressBar percent={project.progressPercent} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="dashboard-section" aria-labelledby="task-breakdown">
+        <h2 id="task-breakdown">Task status</h2>
         <ProgressBar percent={data.progressPercent} />
         <ul className="breakdown">
           <li>To do: {data.tasksPending}</li>
@@ -93,47 +149,6 @@ function StudentContent({ data }: { data: StudentDashboard }) {
           <li>Blocked: {data.tasksBlocked}</li>
           <li>Done: {data.tasksDone}</li>
         </ul>
-      </section>
-
-      <section className="dashboard-block" aria-labelledby="recent-projects">
-        <h2 id="recent-projects">Recent projects</h2>
-        {data.recentProjects.length === 0 ? (
-          <EmptyState title="No projects yet.">
-            <p>
-              <Link to="/projects/new">Propose a project</Link> to start tracking tasks.
-            </p>
-          </EmptyState>
-        ) : (
-          <ul className="dashboard-list">
-            {data.recentProjects.map((project) => (
-              <li key={project.id}>
-                <Link to={`/projects/${project.id}`}>{project.title}</Link>
-                <Badge tone={project.status === 'ARCHIVED' ? 'warning' : 'success'}>
-                  {PROJECT_STATUS_LABELS[project.status]}
-                </Badge>
-                <ProgressBar percent={project.progressPercent} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="dashboard-block" aria-labelledby="upcoming-tasks">
-        <h2 id="upcoming-tasks">Upcoming due dates</h2>
-        {data.upcomingTasks.length === 0 ? (
-          <p className="muted">No open tasks have a due date.</p>
-        ) : (
-          <ul className="dashboard-list">
-            {data.upcomingTasks.map((task) => (
-              <li key={task.id}>
-                <Link to={`/projects/${task.projectId}`}>{task.title}</Link>
-                <span className="muted">
-                  due {formatDate(task.dueDate)} · {TASK_STATUS_LABELS[task.status]}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
     </>
   )
@@ -149,36 +164,71 @@ function FacultyOverview() {
   return <FacultyContent data={data} />
 }
 
+// Faculty come to this page to review, so anything waiting for a decision is the first thing listed.
 function FacultyContent({ data }: { data: FacultyDashboard }) {
+  const waiting = data.projects
+    .filter((project) => project.awaitingReview > 0)
+    .sort((a, b) => b.awaitingReview - a.awaitingReview)
+
   return (
     <>
-      <div className="stat-grid">
-        <Tile label="Supervised projects" value={data.assignedProjects} detail={`${data.activeProjects} active`} />
-        <Tile label="Awaiting review" value={data.submissionsAwaitingReview} />
-        <Tile label="Reviewed" value={data.submissionsReviewed} detail="changes requested or accepted" />
-        <Tile label="Needing attention" value={data.projectsNeedingAttention} detail="have revisions awaiting review" />
-      </div>
+      <SummaryLine
+        items={[
+          `${plural(data.submissionsAwaitingReview, 'submission')} awaiting review`,
+          `${data.submissionsReviewed} reviewed`,
+          `${plural(data.assignedProjects, 'supervised project')}, ${data.activeProjects} active`,
+        ]}
+      />
 
-      <section className="dashboard-block" aria-labelledby="supervised-projects">
+      <section className="dashboard-section" aria-labelledby="awaiting-review">
+        <h2 id="awaiting-review">Awaiting your review</h2>
+        {waiting.length === 0 ? (
+          <p className="muted">Nothing is waiting for a decision.</p>
+        ) : (
+          <ul className="review-queue">
+            {waiting.map((project) => (
+              <ReviewRow key={project.id} project={project} />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="dashboard-section" aria-labelledby="supervised-projects">
         <h2 id="supervised-projects">Supervised projects</h2>
         {data.projects.length === 0 ? (
-          <EmptyState title="No supervised projects yet.">
-            <p>An administrator assigns supervisors to projects.</p>
+          <EmptyState title="No supervised projects yet">
+            <p className="muted">An administrator assigns supervisors to projects.</p>
           </EmptyState>
         ) : (
-          <ul className="dashboard-list">
+          <ul className="project-progress-list">
             {data.projects.map((project) => (
               <li key={project.id}>
-                <Link to={`/projects/${project.id}`}>{project.title}</Link>
-                <Badge tone={project.awaitingReview > 0 ? 'warning' : 'neutral'}>
-                  {project.awaitingReview > 0 ? `${project.awaitingReview} awaiting review` : 'Nothing waiting'}
-                </Badge>
+                <div className="project-progress-head">
+                  <Link to={`/projects/${project.id}`}>{project.title}</Link>
+                  <Badge tone={project.status === 'ARCHIVED' ? 'warning' : 'success'}>
+                    {PROJECT_STATUS_LABELS[project.status]}
+                  </Badge>
+                </div>
               </li>
             ))}
           </ul>
         )}
       </section>
     </>
+  )
+}
+
+function ReviewRow({ project }: { project: AssignedProject }) {
+  return (
+    <li className="review-row">
+      <span className="review-row-main">
+        <Link to={`/projects/${project.id}`}>{project.title}</Link>
+        <span className="muted">{plural(project.awaitingReview, 'submission')} waiting</span>
+      </span>
+      <Link className="button-link primary" to={`/projects/${project.id}#submissions`}>
+        Review
+      </Link>
+    </li>
   )
 }
 
@@ -201,12 +251,20 @@ function AdminContent({ data }: { data: AdminDashboard }) {
 
   return (
     <>
-      <div className="stat-grid">
-        <Tile label="Active accounts" value={users} />
-        <Tile label="Projects" value={projects} detail={`${data.projectsByStatus.ACTIVE} active`} />
-      </div>
+      <SummaryLine
+        items={[
+          `${plural(users, 'active account')}`,
+          `${plural(projects, 'project')}, ${data.projectsByStatus.ACTIVE} active`,
+        ]}
+      />
 
-      <section className="dashboard-block" aria-labelledby="users-by-role">
+      <p>
+        <Link className="button-link primary" to="/admin/users">
+          Manage user accounts
+        </Link>
+      </p>
+
+      <section className="dashboard-section" aria-labelledby="users-by-role">
         <h2 id="users-by-role">Active accounts by role</h2>
         <ul className="breakdown">
           {ROLES.map((role) => (
@@ -217,7 +275,7 @@ function AdminContent({ data }: { data: AdminDashboard }) {
         </ul>
       </section>
 
-      <section className="dashboard-block" aria-labelledby="projects-by-status">
+      <section className="dashboard-section" aria-labelledby="projects-by-status">
         <h2 id="projects-by-status">Projects by status</h2>
         <ul className="breakdown">
           {PROJECT_STATUSES.map((status) => (

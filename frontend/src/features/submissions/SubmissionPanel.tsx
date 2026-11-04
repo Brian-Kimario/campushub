@@ -78,7 +78,7 @@ export function SubmissionPanel({
   }
 
   return (
-    <section className="submission-panel" aria-labelledby="submissions-heading">
+    <section className="submission-panel" id="submissions" aria-labelledby="submissions-heading">
       <div className="page-header">
         <h2 id="submissions-heading">Submissions</h2>
         {canSubmit && !showForm && (
@@ -267,24 +267,24 @@ function ReviewForm({ submission }: { submission: Submission }) {
     <form className="review-form" onSubmit={handleSubmit(onSubmit)} noValidate>
       <h3>Record decision</h3>
       {failure && <ErrorBanner message={failure.message} requestId={failure.requestId} />}
-      <div className="field">
-        <label htmlFor={`${decisionId}-decision`}>Decision</label>
-        <select
-          id={`${decisionId}-decision`}
-          aria-invalid={Boolean(errors.decision)}
-          aria-describedby={errors.decision ? `${decisionId}-decision-error` : undefined}
-          {...register('decision')}
-        >
-          <option value="">Choose a decision</option>
-          <option value="ACCEPTED">Accept</option>
-          <option value="CHANGES_REQUESTED">Request changes</option>
-        </select>
+      <fieldset
+        className="decision-group"
+        aria-invalid={Boolean(errors.decision)}
+        aria-describedby={errors.decision ? `${decisionId}-decision-error` : undefined}
+      >
+        <legend>Decision</legend>
+        <label className="decision-option">
+          <input type="radio" value="ACCEPTED" {...register('decision')} /> Accept
+        </label>
+        <label className="decision-option">
+          <input type="radio" value="CHANGES_REQUESTED" {...register('decision')} /> Request changes
+        </label>
         {errors.decision && (
           <p id={`${decisionId}-decision-error`} className="field-error">
             {errors.decision.message}
           </p>
         )}
-      </div>
+      </fieldset>
       <div className="field">
         <label htmlFor={`${decisionId}-feedback`}>Feedback</label>
         <textarea

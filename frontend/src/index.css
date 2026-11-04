@@ -20,6 +20,7 @@
   --focus: #0f6e63;
   --danger: #a8301f;
   --danger-bg: #fbeeea;
+  --danger-text: #ffffff;
   --success: #1d6b45;
   --success-bg: #e9f4ee;
   --warning: #8a5300;
@@ -57,6 +58,7 @@
     --focus: #6fd0bf;
     --danger: #ff8f80;
     --danger-bg: #3a1a16;
+    --danger-text: #1d0b08;
     --success: #7ee2a8;
     --success-bg: #123023;
     --warning: #f5b544;
@@ -82,6 +84,7 @@
   --focus: #6fd0bf;
   --danger: #ff8f80;
   --danger-bg: #3a1a16;
+  --danger-text: #1d0b08;
   --success: #7ee2a8;
   --success-bg: #123023;
   --warning: #f5b544;
@@ -174,7 +177,7 @@ button.primary:hover:not(:disabled) {
 button.danger {
   background: var(--danger);
   border-color: var(--danger);
-  color: #ffffff;
+  color: var(--danger-text);
   font-weight: 600;
 }
 
@@ -420,6 +423,36 @@ select[aria-invalid='true'] {
   margin-top: 1.5rem;
 }
 
+/* One column below the breakpoint. Wide screens place people and administration beside the work. */
+.project-workspace {
+  display: grid;
+  gap: 0 2rem;
+  margin-top: 0.5rem;
+}
+
+.project-column {
+  min-width: 0;
+}
+
+.project-column > section {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.project-column > section + section {
+  margin-top: 1.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+@media (min-width: 1040px) {
+  .project-workspace {
+    grid-template-columns: minmax(0, 1fr) 17rem;
+    align-items: start;
+  }
+}
+
 @media (max-width: 480px) {
   .details {
     grid-template-columns: 1fr;
@@ -477,45 +510,116 @@ select[aria-invalid='true'] {
   margin-top: 0.5rem;
 }
 
-/* Figures sit in one ruled strip rather than a row of identical cards: the numbers carry the hierarchy. */
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
-  margin-bottom: 2.25rem;
-  border-top: 1px solid var(--border-strong);
+/* Dashboard figures read as one sentence above the work, so the lists below carry the page. */
+.summary-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0 0 1.75rem;
+  padding: 0 0 0.9rem;
+  list-style: none;
+  color: var(--muted);
   border-bottom: 1px solid var(--border);
 }
 
-.stat-tile {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  padding: 1rem 1.1rem 1.1rem 0;
-  min-width: 0;
-}
-
-.stat-tile + .stat-tile {
-  padding-left: 1.1rem;
-  border-left: 1px solid var(--border);
-}
-
-.stat-label {
-  color: var(--muted);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-}
-
-.stat-value {
-  font-family: var(--font-display);
-  font-size: 2.1rem;
-  font-weight: 500;
-  line-height: 1.1;
+.summary-line li {
   font-variant-numeric: tabular-nums;
 }
 
-.dashboard-block {
-  margin-bottom: 1.5rem;
+.dashboard-section {
+  margin-bottom: 2rem;
+}
+
+.dashboard-section > h2 {
+  margin-bottom: 0.5rem;
+}
+
+/* Deadlines lead with the date in a fixed column so the next due item is the first thing the eye lands on. */
+.deadline-list,
+.project-progress-list,
+.review-queue {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.deadline-list li {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr;
+  gap: 0.75rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.deadline-date {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.deadline-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.project-progress-list li,
+.review-queue li {
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.project-progress-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.4rem;
+}
+
+.review-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.review-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.review-row .button-link {
+  white-space: nowrap;
+}
+
+.decision-group {
+  margin: 0 0 1rem;
+  padding: 0;
+  border: 0;
+}
+
+.decision-group legend {
+  margin-bottom: 0.4rem;
+  font-weight: 600;
+}
+
+.decision-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 1.25rem 0.4rem 0;
+  cursor: pointer;
+}
+
+.decision-option input {
+  width: auto;
+  margin: 0;
 }
 
 .dashboard-list {
@@ -595,7 +699,7 @@ select[aria-invalid='true'] {
   text-align: center;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--muted, #555);
+  color: var(--muted);
 }
 
 .calendar-day {
@@ -604,9 +708,9 @@ select[aria-invalid='true'] {
   align-items: flex-start;
   min-height: 3.25rem;
   padding: 0.25rem;
-  border: 1px solid var(--border, #ccc);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  background: var(--surface, #fff);
+  background: var(--surface);
   color: inherit;
   font: inherit;
   text-align: left;
@@ -623,7 +727,7 @@ select[aria-invalid='true'] {
 }
 
 .calendar-day-selected {
-  outline: 2px solid var(--focus, #2563eb);
+  outline: 2px solid var(--focus);
   outline-offset: -2px;
 }
 

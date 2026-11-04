@@ -105,7 +105,7 @@ function UserDirectory() {
       </div>
 
       {issued && (
-        <section aria-labelledby="issued-heading" className="notice">
+        <section aria-labelledby="issued-heading" className="notice" role="status">
           <h2 id="issued-heading">
             {issued.reason === 'created' ? 'Account created' : 'Password reset'} for {issued.email}
           </h2>
