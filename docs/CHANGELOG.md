@@ -23,13 +23,16 @@ Format: each entry has a date, a short title, and the affected documents. Accept
 - Frontend: `npm run build` (type check and bundle) and `npm run lint` pass.
 - Docker Compose: `api` rebuilt with `docker compose up -d --build api`. The MySQL volume was not reset. `/actuator/health/readiness` returns `UP`.
 - Authenticated HTTP against the running stack: admin list returns 200; student and faculty calls to `/admin/users` return 403; unauthenticated returns 401; admin deactivating their own account returns 422; admin role change returns 422 `ROLE_CHANGE_NOT_SUPPORTED`.
+- Browser (2026-11-04, disposable records only): admin creates an account (one-time temporary password, must-change flag shown), resets its password, deactivates and reactivates it; the admin's own row cannot be deactivated. Faculty sees "Administrators only" on `/admin/users`. Student sees the faculty review result as an unread notification. Profile and calendar pages load; `/projects` has no horizontal overflow at 375 px.
+- Audit search `GET /api/v1/admin/audit-events` returns the admin actions, and its `action` filter works (over HTTP).
+- CI for `019327a` (run 41757115852): backend `mvnw verify` pass, frontend pass, API image build pass. GitGuardian reports one failure (`PasswordPolicyTest.java:31`, the test input `"Test@12"`). It is not dismissed; it needs a decision in the GitGuardian dashboard.
 
 **Not verified or not built:**
-- Browser walkthrough of the admin and profile pages in this release. The demo steps in §7 are written but not rehearsed in the browser.
+- Evidence file download, and faculty accepting a second revision in the browser. The backend rules are covered by tests.
 - Project approval (DRAFT → approval → ACTIVE). Projects are still created ACTIVE.
 - Milestone-linked submissions.
 - Administrators cannot change a user's role, and cannot clear a user's department through the admin form (`departmentId` is omitted to leave it unchanged).
-- GitHub Actions status and GitGuardian are external gates and are not reported here.
+- Admin dashboard statistics, and an audit log page in the UI (the audit log is API only).
 
 ## [Phase 8 checkpoint] — 2026-11-04 — Browser check of admin and faculty flows
 
