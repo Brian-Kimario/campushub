@@ -42,6 +42,8 @@ export function AppShell() {
             Notifications
             {unread && unread.count > 0 && <span className="nav-badge" aria-label={`${unread.count} unread`}>{unread.count}</span>}
           </NavLink>
+          {user?.role === 'ADMIN' && <NavLink to="/admin/users">Users</NavLink>}
+          <NavLink to="/profile">Profile</NavLink>
           <NavLink to="/change-password">Change password</NavLink>
         </nav>
         <div className="session">

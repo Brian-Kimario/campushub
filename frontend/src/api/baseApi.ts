@@ -80,6 +80,8 @@ export const baseApi = createApi({
     'Invitation',
     'Calendar',
     'Notification',
+    'Profile',
+    'AdminUser',
   ],
   endpoints: () => ({}),
 })

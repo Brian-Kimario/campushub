@@ -4,6 +4,7 @@ import { AppShell } from '../components/AppShell'
 import { PageLoading } from '../components/ui'
 import { RequireAuth } from '../features/auth/RequireAuth'
 import {
+  AdminUsersPage,
   CalendarPage,
   CertificationsPage,
   ChangePasswordPage,
@@ -11,6 +12,7 @@ import {
   InvitationsPage,
   LoginPage,
   NotificationsPage,
+  ProfilePage,
   ProjectDetailPage,
   ProjectFormPage,
   ProjectListPage,
@@ -43,6 +45,8 @@ export const router = createBrowserRouter([
       { path: 'invitations', element: lazyPage(<InvitationsPage />) },
       { path: 'calendar', element: lazyPage(<CalendarPage />) },
       { path: 'notifications', element: lazyPage(<NotificationsPage />) },
+      { path: 'profile', element: lazyPage(<ProfilePage />) },
+      { path: 'admin/users', element: lazyPage(<AdminUsersPage />) },
       { path: '*', element: <Navigate to="/projects" replace /> },
     ],
   },

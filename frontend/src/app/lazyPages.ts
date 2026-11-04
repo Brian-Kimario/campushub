@@ -13,3 +13,5 @@ export const CertificationsPage = lazy(() => import('../features/certifications/
 export const InvitationsPage = lazy(() => import('../features/invitations/InvitationsPage'))
 export const CalendarPage = lazy(() => import('../features/calendar/CalendarPage'))
 export const NotificationsPage = lazy(() => import('../features/notifications/NotificationsPage'))
+export const ProfilePage = lazy(() => import('../features/profile/ProfilePage'))
+export const AdminUsersPage = lazy(() => import('../features/admin/AdminUsersPage'))
