@@ -126,7 +126,7 @@ Problem type URI: `urn:campushub:problem:<code lower-kebab>`, e.g. `urn:campushu
 | POST | `/admin/catalog/departments` | ADMIN | Create; 409 `DUPLICATE` on code |
 | PATCH | `/admin/catalog/departments/{id}` | ADMIN | Update name or active |
 | DELETE | `/admin/catalog/departments/{id}` | ADMIN | Delete only if unreferenced; else 409 `CATALOG_ITEM_IN_USE` (FR-CAT-03) |
-| POST/PATCH/DELETE | `/admin/catalog/terms[/{id}]` | ADMIN | Same rules; `endsOn > startsOn` (422 `VALIDATION_FAILED`) |
+| POST/PATCH/DELETE | `/admin/catalog/terms[/{id}]` | ADMIN | Same rules; `endsOn > startsOn` checked on the merged dates (400 `VALIDATION_FAILED`, field `endsOn`) |
 | POST/PATCH/DELETE | `/admin/catalog/courses[/{id}]` | ADMIN | Same rules |
 
 Catalog GET responses are cached (ADR-010). Every admin write evicts the affected cache name.

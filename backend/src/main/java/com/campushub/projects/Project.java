@@ -33,6 +33,12 @@ public class Project {
     @JdbcTypeCode(SqlTypes.BINARY)
     private UUID supervisorId;
 
+    @JdbcTypeCode(SqlTypes.BINARY)
+    private UUID termId;
+
+    @JdbcTypeCode(SqlTypes.BINARY)
+    private UUID courseId;
+
     @Enumerated(EnumType.STRING)
     private ProjectStatus status;
 
@@ -114,6 +120,14 @@ public class Project {
 
     public UUID getSupervisorId() {
         return supervisorId;
+    }
+
+    public UUID getTermId() {
+        return termId;
+    }
+
+    public UUID getCourseId() {
+        return courseId;
     }
 
     public ProjectStatus getStatus() {

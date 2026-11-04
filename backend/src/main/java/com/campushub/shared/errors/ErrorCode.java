@@ -23,6 +23,7 @@ public enum ErrorCode {
     VERSION_SEALED(HttpStatus.CONFLICT, "Version is sealed"),
     FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "File is too large"),
     DUPLICATE(HttpStatus.CONFLICT, "Duplicate value"),
+    CATALOG_ITEM_IN_USE(HttpStatus.CONFLICT, "Catalog item is in use"),
     TEAM_FULL(HttpStatus.CONFLICT, "Team is full"),
     PRECONDITION_NOT_MET(HttpStatus.UNPROCESSABLE_ENTITY, "Precondition not met"),
     PROJECT_NOT_OPEN_FOR_MEMBERSHIP(HttpStatus.UNPROCESSABLE_ENTITY, "Project is not open for membership"),
