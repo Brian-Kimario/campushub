@@ -35,11 +35,12 @@ export default function CertificationsPage() {
 
       {user?.role === 'STUDENT' && (
         <>
-          <section aria-labelledby="add-certification-heading">
+          {/* The portfolio leads; the add form follows it so the page reads as a record first. */}
+          <CertificationList />
+          <section className="add-certification" aria-labelledby="add-certification-heading">
             <h2 id="add-certification-heading">Add a certification</h2>
             <CertificationForm idPrefix="new" submitLabel="Add certification" />
           </section>
-          <CertificationList />
         </>
       )}
     </section>
@@ -79,7 +80,7 @@ function CertificationList() {
 
       {data && data.content.length === 0 && (
         <EmptyState title="No certifications yet">
-          <p className="muted">Add a certification above. Only you can see it.</p>
+          <p className="muted">Add your first certification below. Only you can see it.</p>
         </EmptyState>
       )}
 
