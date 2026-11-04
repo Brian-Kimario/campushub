@@ -84,6 +84,7 @@ Refresh sessions (ADR-025, supersedes ADR-004): `POST /auth/login` also sets the
 | 413 | `FILE_TOO_LARGE` | File over 20 MiB |
 | 422 | `PROPOSAL_INCOMPLETE` | Missing title, description, term, or milestone; `missing[]` lists fields |
 | 422 | `PROJECT_ARCHIVED` | Write to an archived project |
+| 422 | `ROLE_CHANGE_NOT_SUPPORTED` | Admin attempted to change an account's role (MVP; PATCH `/admin/users/{id}`) |
 | 422 | `PROJECT_NOT_EDITABLE` | Project details cannot change in its current state |
 | 422 | `PROJECT_NOT_OPEN_FOR_MEMBERSHIP` | Invitation or join on a completed or archived project |
 | 422 | `SUPERVISOR_NOT_ELIGIBLE` | Supervisor is not an active faculty user |
@@ -110,7 +111,7 @@ Problem type URI: `urn:campushub:problem:<code lower-kebab>`, e.g. `urn:campushu
 | GET | `/users/{id}` | see matrix | Public profile card | Name, role, department. 404 if not permitted |
 | GET | `/admin/users` | ADMIN | List with `role`, `status`, `q` (email/name prefix) | Paginated; sort allowlist: `displayName`, `email`, `createdAt` |
 | POST | `/admin/users` | ADMIN | Create account | Body: `email`, `institutionalId?`, `displayName`, `role`, `departmentId?`. Returns 201 with `temporaryPassword` shown once |
-| POST | `/admin/users/{id}/deactivate` | ADMIN | Deactivate (ADR-017) | 200; writes audit; 422 if the user is the last ADMIN |
+| POST | `/admin/users/{id}/deactivate` | ADMIN | Deactivate (ADR-017) | 200; revokes existing tokens; writes audit; 422 `PRECONDITION_NOT_MET` for the caller's own account or the last active ADMIN |
 | POST | `/admin/users/{id}/reactivate` | ADMIN | Reactivate | 200 |
 | POST | `/admin/users/{id}/reset-password` | ADMIN | New temporary password | 201 with `temporaryPassword`; sets `mustChangePassword=true`; revokes existing tokens |
 | PATCH | `/admin/users/{id}` | ADMIN | Edit profile fields and `departmentId` | Role change returns 422 `ROLE_CHANGE_NOT_SUPPORTED` in MVP |

@@ -1,7 +1,7 @@
 # CampusHub — MVP Demonstration Script
 
 **Purpose:** Run the MVP demonstration end to end in the React UI on a local machine, from startup to the student seeing faculty feedback.
-**Scope:** The MVP only: login and forced password change, project proposal and supervisor assignment, tasks, submissions and revisions, faculty review with feedback, and the student's view of the decision. Everything else in the full plan (calendar, invitations, milestones, audit log UI, deactivation, file uploads) is out of MVP scope and is not demonstrated.
+**Scope:** The MVP only: login and forced password change, project proposal and supervisor assignment, tasks, submissions and revisions, faculty review with feedback, and the student's view of the decision. Profile editing and administrator user management are demonstrated in §7. Everything else in the full plan (calendar, invitations, milestones, audit log UI, file uploads) is out of MVP scope and is not demonstrated.
 **Last reviewed:** 2026-11-03 (MVP Stage 4)
 **Related:** [API_CONTRACT.md](API_CONTRACT.md), [AUTHORIZATION_MATRIX.md](AUTHORIZATION_MATRIX.md), [IMPLEMENTATION_LOG.md](IMPLEMENTATION_LOG.md) §11.
 
@@ -214,8 +214,28 @@ docker compose down -v
 
 ## 6. Known limitations
 
-- The MVP has no file upload, calendar, invitations, milestones, audit log UI, or account deactivation UI. These are out of MVP scope.
+- The MVP has no file upload, calendar, invitations, milestones, or audit log UI. These are out of MVP scope.
 - The task list returns at most 50 tasks per project, and the UI has no pagination controls.
 - The break-glass path for administrators to read a private submission is deferred (ADR-007), so the admin account cannot open a student's submission files.
 - The intermittent sign-out failure seen earlier (needing a second click) did not recur in the final browser check, but it was not stress-tested. The refresh-cookie fix addresses its likely cause (an expired access token blocking `/auth/logout`), which is covered by a backend test.
 - The compose API port (8080) must not be used by another process during the demo.
+- Project lifecycle (a DRAFT project awaiting approval before it becomes ACTIVE) is not implemented. Projects are created ACTIVE. Milestone-linked submissions are not implemented either.
+- An administrator cannot change a user's role (the API returns `ROLE_CHANGE_NOT_SUPPORTED`) or clear a department through the admin form. Both are deliberate MVP limits.
+
+## 7. Profile and user administration
+
+Steps for about two minutes. Use the seeded accounts from §2 unless noted.
+
+**7.1 Student edits a profile.** Sign in as `student@campushub.local`, open **Profile**, change the display name, pick a department, and fill in program, cohort, and bio. Select **Save**. The page shows "Profile saved." Reload the page: the values persist. The email, institutional ID, and role are shown read-only, because the API does not accept changes to them.
+
+**7.2 Administrator creates an account.** Sign in as `admin@campushub.local` and open **Users**. Under **Create an account**, enter a new email (for example `demo.new@campushub.local`), a display name, and the role Student. Select **Create account**. A temporary password appears once in the panel above the directory. Copy it before dismissing the panel.
+
+**7.3 Filter and search.** In **Directory**, set Role to Student, then search for `demo`. The new account is listed. Its password is never shown in the list.
+
+**7.4 Reset the password.** Select **Reset password for** the new account and confirm. A new temporary password appears. The account is marked "must change password".
+
+**7.5 Deactivate and reactivate.** Select **Deactivate** on the account and confirm. Sign in as that account in a private window: the sign-in is refused. Back as admin, select **Reactivate**. The account can sign in again.
+
+**7.6 Self-protection.** On the admin's own row, the **Deactivate** button is disabled. The API also refuses the request with `PRECONDITION_NOT_MET` if it is sent directly.
+
+**7.7 Role change is refused.** Send `PATCH /api/v1/admin/users/{id}` with `{"role":"ADMIN"}` as the admin. The response is 422 `ROLE_CHANGE_NOT_SUPPORTED`, and the role is unchanged.

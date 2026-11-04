@@ -18,7 +18,7 @@ Architecture: a modular monolith. One deployable Spring Boot service, internally
 
 ## Documentation map
 
-Start at **[docs/INDEX.md](docs/INDEX.md)**. Canonical sources:
+Start at **[docs/INDEX.md](docs/INDEX.md)**. For a live demonstration on the seeded local stack, follow **[docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)**. Canonical sources:
 
 - Product and scope: [PRODUCT](docs/PRODUCT.md), [REQUIREMENTS](docs/REQUIREMENTS.md), [USER_STORIES](docs/USER_STORIES.md), [SCOPE](docs/SCOPE.md)
 - Design: [ARCHITECTURE](docs/ARCHITECTURE.md), [DATA_MODEL](docs/DATA_MODEL.md), [ERD](docs/ERD.md), [API_CONTRACT](docs/API_CONTRACT.md), [STATE_MACHINES](docs/STATE_MACHINES.md), [UX_UI](docs/UX_UI.md)

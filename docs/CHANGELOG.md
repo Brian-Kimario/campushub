@@ -7,6 +7,30 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [Emergency completion] — 2026-11-04 — User profiles and administrator user management
+
+**Status:** Implemented and verified locally. Not merged. Pushed to `phase-7a-certifications` only.
+
+**Affected documents:** `docs/CHANGELOG.md` (this entry), `docs/API_CONTRACT.md` (§3 `ROLE_CHANGE_NOT_SUPPORTED`; §4 `/users/me`, `/admin/users`), `docs/DEMO_SCRIPT.md` (§7 demo steps, updated limitations), `README.md` (demo pointer).
+
+**Built:**
+- Profiles: `GET` and `PATCH /users/me` for display name, department, program, cohort, designation, and bio. Email, role, status, and institutional ID are not editable and return `FIELD_NOT_EDITABLE`. Frontend profile page at `/profile`.
+- Administrator user management under `/admin/users`: list with role, status, and prefix search; create (returns a one-time temporary password and sets must-change-password); update (role changes return 422 `ROLE_CHANGE_NOT_SUPPORTED`); deactivate and reactivate (deactivation revokes existing tokens); reset password (revokes existing tokens and issues a new temporary password). Each action is audited (`admin.user.*`). Frontend page at `/admin/users`, visible only to administrators.
+- Self-deactivation and deactivating the last active administrator are refused with 422 `PRECONDITION_NOT_MET`. The last-administrator check is defensive only: the self-check already prevents the case through the API.
+
+**Verified:**
+- `./mvnw -B verify` passed: 226 tests, 0 failures, 0 errors, 0 skipped. This includes `ProfileFlowIntegrationTest` (9) and `UserAdminFlowIntegrationTest` (11).
+- Frontend: `npm run build` (type check and bundle) and `npm run lint` pass.
+- Docker Compose: `api` rebuilt with `docker compose up -d --build api`. The MySQL volume was not reset. `/actuator/health/readiness` returns `UP`.
+- Authenticated HTTP against the running stack: admin list returns 200; student and faculty calls to `/admin/users` return 403; unauthenticated returns 401; admin deactivating their own account returns 422; admin role change returns 422 `ROLE_CHANGE_NOT_SUPPORTED`.
+
+**Not verified or not built:**
+- Browser walkthrough of the admin and profile pages in this release. The demo steps in §7 are written but not rehearsed in the browser.
+- Project approval (DRAFT → approval → ACTIVE). Projects are still created ACTIVE.
+- Milestone-linked submissions.
+- Administrators cannot change a user's role, and cannot clear a user's department through the admin form (`departmentId` is omitted to leave it unchanged).
+- GitHub Actions status and GitGuardian are external gates and are not reported here.
+
 ## [Phase 8 checkpoint] — 2026-11-04 — Browser check of admin and faculty flows
 
 **Status:** Partial. Checked in the built-in browser against the local stack with Kafka disabled.
