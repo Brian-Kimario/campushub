@@ -23,6 +23,7 @@ import {
   StatusDistribution,
   type CountRow,
 } from './DashboardParts'
+import { daysUntil } from './dueDates'
 import type { ProjectStatus, Role, TaskStatus } from '../../api/types'
 
 export default function DashboardPage() {
@@ -43,17 +44,6 @@ export default function DashboardPage() {
 
 function plural(count: number, word: string) {
   return `${count} ${word}${count === 1 ? '' : 's'}`
-}
-
-const DAY_MS = 86_400_000
-
-// Due dates are calendar dates (YYYY-MM-DD), so compare them as UTC midnights to avoid zone drift.
-function daysUntil(localDate: string): number {
-  const [year, month, day] = localDate.split('-').map(Number)
-  const now = new Date()
-  const dueUtc = Date.UTC(year, month - 1, day)
-  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
-  return Math.round((dueUtc - todayUtc) / DAY_MS)
 }
 
 function dueLabel(days: number): string {
