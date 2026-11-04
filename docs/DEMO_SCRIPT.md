@@ -123,10 +123,9 @@ CI results for `019327a` (run 41757115852, checked 2026-11-04):
 
 - **GitGuardian check fails.** It flags one Generic Password finding at `backend/src/test/java/com/campushub/identity/PasswordPolicyTest.java:31`, which is the deliberately short test input `"Test@12"` (introduced in commit `b3cad32`). It is not a live credential. The finding is not dismissed in this repository; it needs a decision in the GitGuardian dashboard. Say this plainly if asked.
 - **2C and 2D are deferred** (§0).
-- No file upload or evidence download was exercised in the final check.
-- Accepting a second revision and the student seeing that decision was not run in the browser; the backend rules are covered by tests.
+- Evidence files are exercised on disposable records only. Accepted revisions no longer offer "Add a file", so uploads apply to open revisions only. A non-member gets 404 for a file, not 403, so the file's existence is not revealed.
 - Audit search has no UI page; it is API only.
-- The admin area has no statistics dashboard. Admin role changes are refused (`ROLE_CHANGE_NOT_SUPPORTED`), and a department cannot be cleared through the admin form.
+- The admin dashboard (`/dashboard`) shows counts only: active accounts by role and projects by status. There are no charts or time series. Admin role changes are refused (`ROLE_CHANGE_NOT_SUPPORTED`), and a department cannot be cleared through the admin form.
 - The task list returns at most 50 tasks per project, and there are no pagination controls in the UI.
 - Notifications are polled, not pushed.
 - Mobile layout was checked only on `/projects` at 375 px (no horizontal scroll). Other pages were not checked at that width.
@@ -161,9 +160,12 @@ These are not part of the 8-minute run.
 | Calendar page loads | Verified in browser | Month view renders, with the empty-day message |
 | Mobile layout at 375 px (`/projects`) | Verified in browser | No horizontal overflow (scrollWidth equals clientWidth) |
 | CI for `019327a` (backend, frontend, image build) | Verified on GitHub | Run 41757115852: all pass except GitGuardian |
-| Evidence file download | Not verified | Requires an uploaded file; not run |
-| Faculty accepts a second revision; student sees it | Not verified in browser | Backend rules covered by `SubmissionFlowIntegrationTest` |
-| Invitations and collaboration in the UI | Not verified in browser | Covered by backend tests |
+| Admin dashboard `/dashboard` reachable from the nav; shows counts | Verified in browser | Admin nav shows Dashboard (fixed: it was hidden from admins). Active accounts by role and projects by status shown |
+| Faculty accepts revision 2; student is notified | Verified in browser | Revision 2 shows "Accepted"; student's unread notification "Dev Faculty accepted your submission in…" |
+| Evidence upload, download and integrity | Verified in browser | PNG uploaded to a disposable project; downloaded bytes match the SHA-256 of the original |
+| Evidence authorization | Verified over HTTP | Non-member student gets 404 for the file content; no token gets 401 |
+| Invitation, accept and access | Verified in browser | Owner invites `student2@campushub.local`; invitee accepts on `/invitations`; the project appears in their list and the owner gets the acceptance notification |
+| CI for `b71dfd7` (backend, frontend, image build) | Verified on GitHub | Run 41758924884: all pass; GitGuardian still fails (see §5) |
 | Mobile layout on pages other than `/projects` | Not verified | — |
 | Kafka path | Not verified | Off by default; not exercised |
 

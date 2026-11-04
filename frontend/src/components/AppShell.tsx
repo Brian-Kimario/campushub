@@ -32,7 +32,9 @@ export function AppShell() {
       <header className="app-header">
         <span className="brand">CampusHub</span>
         <nav aria-label="Main">
-          {(user?.role === 'STUDENT' || user?.role === 'FACULTY') && <NavLink to="/dashboard">Dashboard</NavLink>}
+          {(user?.role === 'STUDENT' || user?.role === 'FACULTY' || user?.role === 'ADMIN') && (
+            <NavLink to="/dashboard">Dashboard</NavLink>
+          )}
           <NavLink to="/projects">Projects</NavLink>
           <NavLink to="/calendar">Calendar</NavLink>
           <NavLink to="/skills">Skills</NavLink>

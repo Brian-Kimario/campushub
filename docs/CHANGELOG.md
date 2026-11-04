@@ -7,6 +7,18 @@
 
 Format: each entry has a date, a short title, and the affected documents. Accepted ADRs are not edited; a change is a new entry and a new ADR that supersedes the old one.
 
+## [Final demo freeze] — 2026-11-04 — Admin dashboard navigation, and end-to-end checks
+
+**Affected documents:** `docs/DEMO_SCRIPT.md` (§5 and §7), `frontend/src/components/AppShell.tsx`.
+
+**Changed:**
+- The Dashboard link in the main navigation was hidden from administrators, so `/dashboard` (the admin counts page) could only be reached by typing the URL. The link now shows for all three roles.
+- Corrects the earlier statement that the admin area has no statistics. The admin dashboard shows counts only (active accounts by role, projects by status).
+
+**Verified in the browser or over HTTP (disposable records only):** revision 2 accepted by faculty and the student notified; evidence PNG uploaded and downloaded with a matching SHA-256; a non-member gets 404 for the file; a team invitation accepted by a second student, who then sees the project. CI for `b71dfd7` passed on backend, frontend, and image build. GitGuardian is still failing; it needs a decision in its dashboard.
+
+**Not changed:** the dated entries above are historical records and keep their original wording.
+
 ## [Emergency completion] — 2026-11-04 — User profiles and administrator user management
 
 **Status:** Implemented and verified locally. Not merged. Pushed to `phase-7a-certifications` only.
