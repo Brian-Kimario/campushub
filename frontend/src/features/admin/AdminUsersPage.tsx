@@ -179,54 +179,56 @@ function UserDirectory() {
 
         {data && data.content.length > 0 && (
           <>
-            <table className="admin-users">
-              <caption className="sr-only">Accounts matching the current filters</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Name</th>
-                  <th scope="col">Email</th>
-                  <th scope="col">Role</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.content.map((user) => {
-                  const self = me?.id === user.id
-                  return (
-                    <tr key={user.id}>
-                      <td>
-                        {user.displayName}
-                        {user.mustChangePassword && <span className="muted"> · must change password</span>}
-                      </td>
-                      <td>{user.email}</td>
-                      <td>{ROLE_LABELS[user.role]}</td>
-                      <td>{user.status === 'ACTIVE' ? 'Active' : 'Deactivated'}</td>
-                      <td className="row-actions">
-                        {user.status === 'ACTIVE' ? (
-                          <button
-                            type="button"
-                            className="danger"
-                            disabled={self}
-                            title={self ? 'You cannot deactivate your own account' : undefined}
-                            onClick={() => setPending({ user, action: 'deactivate' })}
-                          >
-                            Deactivate {user.displayName}
+            <div className="table-scroll">
+              <table className="admin-users">
+                <caption className="sr-only">Accounts matching the current filters</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Email</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.content.map((user) => {
+                    const self = me?.id === user.id
+                    return (
+                      <tr key={user.id}>
+                        <td>
+                          {user.displayName}
+                          {user.mustChangePassword && <span className="muted"> · must change password</span>}
+                        </td>
+                        <td>{user.email}</td>
+                        <td>{ROLE_LABELS[user.role]}</td>
+                        <td>{user.status === 'ACTIVE' ? 'Active' : 'Deactivated'}</td>
+                        <td className="row-actions">
+                          {user.status === 'ACTIVE' ? (
+                            <button
+                              type="button"
+                              className="danger"
+                              disabled={self}
+                              title={self ? 'You cannot deactivate your own account' : undefined}
+                              onClick={() => setPending({ user, action: 'deactivate' })}
+                            >
+                              Deactivate<span className="sr-only"> {user.displayName}</span>
+                            </button>
+                          ) : (
+                            <button type="button" onClick={() => setPending({ user, action: 'reactivate' })}>
+                              Reactivate<span className="sr-only"> {user.displayName}</span>
+                            </button>
+                          )}
+                          <button type="button" onClick={() => setPending({ user, action: 'reset' })}>
+                            Reset password<span className="sr-only"> for {user.displayName}</span>
                           </button>
-                        ) : (
-                          <button type="button" onClick={() => setPending({ user, action: 'reactivate' })}>
-                            Reactivate {user.displayName}
-                          </button>
-                        )}
-                        <button type="button" onClick={() => setPending({ user, action: 'reset' })}>
-                          Reset password for {user.displayName}
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
             <nav className="pager" aria-label="Users pagination">
               <button type="button" onClick={() => setPage(page - 1)} disabled={page === 0 || isFetching}>
                 Previous
@@ -322,7 +324,7 @@ function CreateUserForm({ onCreated }: { onCreated: (issued: Issued) => void }) 
   }
 
   return (
-    <section aria-labelledby="create-user-heading">
+    <section className="create-user" aria-labelledby="create-user-heading">
       <h2 id="create-user-heading">Create an account</h2>
       <form onSubmit={handleSubmit} noValidate>
         <div className="field">
