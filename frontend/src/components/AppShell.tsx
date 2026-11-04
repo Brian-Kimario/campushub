@@ -5,10 +5,11 @@ import { baseApi } from '../api/baseApi'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
 import { sessionCleared } from '../features/auth/authSlice'
 import { useLogoutMutation } from '../features/auth/authApi'
+import { useGetProjectQuery } from '../features/projects/projectsApi'
 import { useUnreadNotificationCountQuery } from '../features/notifications/notificationsApi'
 import { ProfileMenu } from './ProfileMenu'
 import { Sidebar, SIDEBAR_ID } from './Sidebar'
-import { navItemsFor, routeMeta } from './navigation'
+import { navItemsFor, projectIdFromPath, routeMeta } from './navigation'
 import './shell.css'
 
 const SIDEBAR_STORAGE_KEY = 'campushub.sidebarCollapsed'
@@ -43,6 +44,9 @@ export function AppShell() {
   // Polls once a minute: notifications are database rows, not pushed (outbox and Kafka are deferred).
   const { data: unread } = useUnreadNotificationCountQuery(undefined, { pollingInterval: 60_000 })
   const unreadCount = unread?.count ?? 0
+  // Shares the cache entry the project page reads, so the breadcrumb adds no extra request.
+  const detailProjectId = projectIdFromPath(location.pathname) ?? ''
+  const { data: detailProject } = useGetProjectQuery(detailProjectId, { skip: !detailProjectId })
 
   const [collapsed, setCollapsed] = useState(readInitialCollapsed)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -50,7 +54,7 @@ export function AppShell() {
   const drawerCloseRef = useRef<HTMLButtonElement>(null)
 
   const groups = useMemo(() => navItemsFor(user?.role), [user?.role])
-  const meta = routeMeta(location.pathname)
+  const meta = routeMeta(location.pathname, detailProject?.title)
 
   function toggleCollapsed() {
     setCollapsed((current) => {

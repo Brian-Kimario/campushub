@@ -74,8 +74,18 @@ const ROUTE_META: { match: (path: string) => boolean; meta: RouteMeta }[] = [
   { match: (path) => path === '/change-password', meta: { section: 'Account', title: 'Change password' } },
 ]
 
-export function routeMeta(path: string): RouteMeta | null {
-  return ROUTE_META.find((entry) => entry.match(path))?.meta ?? null
+// Only the project detail route needs data for its title, so it is the one route the shell looks up.
+const PROJECT_DETAIL_PATH = /^\/projects\/([^/]+)$/
+
+export function projectIdFromPath(path: string): string | null {
+  const id = PROJECT_DETAIL_PATH.exec(path)?.[1]
+  return id && id !== 'new' ? id : null
+}
+
+export function routeMeta(path: string, projectTitle?: string): RouteMeta | null {
+  const meta = ROUTE_META.find((entry) => entry.match(path))?.meta ?? null
+  if (meta && projectTitle && projectIdFromPath(path)) return { ...meta, title: projectTitle }
+  return meta
 }
 
 export function navItemsFor(role: Role | undefined): NavGroup[] {
