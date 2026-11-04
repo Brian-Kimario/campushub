@@ -26,6 +26,8 @@
   --warning: #8a5300;
   --warning-bg: #fbf3e0;
   --info-bg: #eaf1f8;
+  --chart-progress: #5b7f95;
+  --chart-todo: #c4bfb3;
 
   /* Navigation chrome stays dark in both themes. */
   --graphite-950: #121417;
@@ -64,6 +66,8 @@
     --warning: #f5b544;
     --warning-bg: #3a2a0c;
     --info-bg: #13263a;
+    --chart-progress: #8fb4c7;
+    --chart-todo: #5d646c;
     --shadow-menu: 0 12px 32px rgb(0 0 0 / 0.45), 0 1px 2px rgb(0 0 0 / 0.3);
     color-scheme: dark;
   }
@@ -90,6 +94,8 @@
   --warning: #f5b544;
   --warning-bg: #3a2a0c;
   --info-bg: #13263a;
+  --chart-progress: #8fb4c7;
+  --chart-todo: #5d646c;
   --shadow-menu: 0 12px 32px rgb(0 0 0 / 0.45), 0 1px 2px rgb(0 0 0 / 0.3);
   color-scheme: dark;
 }
@@ -510,92 +516,73 @@ select[aria-invalid='true'] {
   margin-top: 0.5rem;
 }
 
-/* Dashboard figures read as one sentence above the work, so the lists below carry the page. */
-.summary-line {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 1.25rem;
-  margin: 0 0 1.75rem;
-  padding: 0 0 0.9rem;
-  list-style: none;
-  color: var(--muted);
-  border-bottom: 1px solid var(--border);
-}
-
-.summary-line li {
-  font-variant-numeric: tabular-nums;
-}
-
-.dashboard-section {
-  margin-bottom: 2rem;
-}
-
-.dashboard-section > h2 {
-  margin-bottom: 0.5rem;
-}
-
-/* Deadlines lead with the date in a fixed column so the next due item is the first thing the eye lands on. */
-.deadline-list,
-.project-progress-list,
-.review-queue {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.deadline-list li {
+/* Faculty dashboard: submissions waiting for a decision, then supervised projects. */
+.review-list {
   display: grid;
-  grid-template-columns: 7.5rem 1fr;
-  gap: 0.75rem;
-  padding: 0.6rem 0;
-  border-top: 1px solid var(--border);
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.deadline-date {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.deadline-main {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.project-progress-list li,
-.review-queue li {
-  padding: 0.7rem 0;
-  border-top: 1px solid var(--border);
-}
-
-.project-progress-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 0.75rem;
-  margin-bottom: 0.4rem;
-}
-
-.review-row {
+.review-item {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem 1rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
 }
 
-.review-row-main {
+.review-item-main {
   display: flex;
+  flex: 1 1 0;
   flex-direction: column;
   gap: 0.15rem;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.review-row .button-link {
+.review-item .button-link {
   white-space: nowrap;
+}
+
+.dash-note {
+  margin: 0.85rem 0 0;
+  font-size: 0.85rem;
+}
+
+.supervised-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.supervised-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.supervised-item:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.supervised-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+}
+
+.supervised-item-head > a {
+  overflow-wrap: anywhere;
 }
 
 .decision-group {
@@ -638,40 +625,343 @@ select[aria-invalid='true'] {
   gap: 0.5rem;
 }
 
-.breakdown {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
+/* Admin dashboard: each count sits beside a track scaled to the total, so the figures stay readable at any width. */
+.count-breakdown {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0;
   padding: 0;
   list-style: none;
-  color: var(--muted);
 }
 
-.progress {
-  position: relative;
-  width: 100%;
-  max-width: 28rem;
-  height: 1.25rem;
+.count-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(4rem, 2fr) 2.5rem;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.count-label {
+  overflow-wrap: anywhere;
+}
+
+.count-track {
+  display: block;
+  height: 0.5rem;
   border-radius: 999px;
   background: var(--border);
   overflow: hidden;
-  margin: 0.5rem 0;
 }
 
-.progress-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
+.count-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--chart-progress);
+}
+
+.count-value {
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Student and faculty dashboards: metrics first, then the main panels beside each other on desktop. */
+.dashboard-header {
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+}
+
+.dashboard-subtitle {
+  margin: 0.2rem 0 0;
+  font-size: 0.925rem;
+}
+
+.metric-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.metric-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.metric-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.metric-value {
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-detail {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.metric-detail .progress-indicator {
+  margin-top: 0.3rem;
+}
+
+.dash-columns {
+  display: grid;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+/* Panels inside a column are sections, so keep the global section spacing from pushing the second one down. */
+.dash-columns > .dash-panel {
+  margin-top: 0;
+}
+
+.dash-panel {
+  min-width: 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.dash-panel-full {
+  margin-top: 1.25rem;
+}
+
+.dash-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.dash-panel-link {
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.upcoming-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.upcoming-item {
+  display: grid;
+  grid-template-columns: 3.25rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+}
+
+.upcoming-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.3rem 0;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  line-height: 1.1;
+}
+
+.upcoming-day-number {
+  font-size: 1.2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.upcoming-day-month {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.upcoming-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.upcoming-body > a {
+  font-weight: 600;
+}
+
+.upcoming-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.6rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.upcoming-urgent {
+  font-weight: 600;
+  color: var(--warning);
+}
+
+.status-distribution {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.status-bar {
+  display: flex;
+  height: 0.6rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.status-bar > span {
+  height: 100%;
+  min-width: 0;
+}
+
+.status-legend {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+.status-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-swatch {
+  flex: none;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 2px;
+}
+
+.status-count {
+  margin-left: auto;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.status-bar-done {
   background: var(--accent);
 }
 
-.progress-text {
-  position: absolute;
-  inset: 0;
+.status-bar-progress {
+  background: var(--chart-progress);
+}
+
+.status-bar-review {
+  background: var(--warning);
+}
+
+.status-bar-todo {
+  background: var(--chart-todo);
+}
+
+.status-bar-blocked {
+  background: var(--danger);
+}
+
+.progress-indicator {
   display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.progress-track {
+  height: 0.45rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.progress-track > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.project-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+}
+
+.project-card-head {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  color: var(--text);
+  justify-content: space-between;
+  gap: 0.4rem 0.6rem;
+  min-width: 0;
+}
+
+.project-card-head > a {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 1040px) {
+  .metric-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .metric-strip.metric-strip-three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dash-columns {
+    grid-template-columns: minmax(0, 1fr) 18rem;
+  }
+
+  .dash-columns.dash-columns-equal {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* Calendar and team views. The grid keeps seven equal columns at phone width; details sit below it. */

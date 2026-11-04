@@ -2,7 +2,6 @@ import { Link } from 'react-router'
 import { describeError } from '../../api/problem'
 import { useAppSelector } from '../../app/hooks'
 import {
-  formatDate,
   PROJECT_STATUS_LABELS,
   ROLE_LABELS,
   TASK_STATUS_LABELS,
@@ -13,23 +12,31 @@ import {
   useGetFacultyDashboardQuery,
   useGetStudentDashboardQuery,
   type AdminDashboard,
-  type AssignedProject,
   type FacultyDashboard,
   type StudentDashboard,
 } from './dashboardApi'
-import type { ProjectStatus, Role } from '../../api/types'
+import {
+  CountBreakdown,
+  DashboardPanel,
+  MetricTile,
+  ProgressIndicator,
+  StatusDistribution,
+  type CountRow,
+} from './DashboardParts'
+import type { ProjectStatus, Role, TaskStatus } from '../../api/types'
 
 export default function DashboardPage() {
   const role = useAppSelector((state) => state.auth.user?.role)
+
+  if (role === 'STUDENT') return <StudentOverview />
+  if (role === 'FACULTY') return <FacultyOverview />
+  if (role === 'ADMIN') return <AdminOverview />
 
   return (
     <section>
       <div className="page-header">
         <h1>Dashboard</h1>
       </div>
-      {role === 'STUDENT' && <StudentOverview />}
-      {role === 'FACULTY' && <FacultyOverview />}
-      {role === 'ADMIN' && <AdminOverview />}
     </section>
   )
 }
@@ -38,82 +45,158 @@ function plural(count: number, word: string) {
   return `${count} ${word}${count === 1 ? '' : 's'}`
 }
 
-// One line of figures under the heading. Numbers read as a sentence, not as a grid of equal boxes.
-function SummaryLine({ items }: { items: string[] }) {
-  return (
-    <ul className="summary-line" aria-label="Summary">
-      {items.map((item) => (
-        <li key={item}>{item}</li>
-      ))}
-    </ul>
-  )
+const DAY_MS = 86_400_000
+
+// Due dates are calendar dates (YYYY-MM-DD), so compare them as UTC midnights to avoid zone drift.
+function daysUntil(localDate: string): number {
+  const [year, month, day] = localDate.split('-').map(Number)
+  const now = new Date()
+  const dueUtc = Date.UTC(year, month - 1, day)
+  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+  return Math.round((dueUtc - todayUtc) / DAY_MS)
 }
 
-function ProgressBar({ percent }: { percent: number | null }) {
-  if (percent === null) {
-    return <span className="muted">No tasks yet</span>
+function dueLabel(days: number): string {
+  if (days < 0) return 'Past due'
+  if (days === 0) return 'Due today'
+  if (days === 1) return 'Due tomorrow'
+  return `Due in ${days} days`
+}
+
+function dayAndMonth(localDate: string) {
+  const [year, month, day] = localDate.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  return {
+    day: String(day),
+    month: date.toLocaleDateString(undefined, { month: 'short' }),
   }
-  return (
-    <div
-      className="progress"
-      role="progressbar"
-      aria-label="Task progress"
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={percent}
-    >
-      <span className="progress-fill" style={{ width: `${percent}%` }} />
-      <span className="progress-text">{percent}% done</span>
-    </div>
-  )
+}
+
+const TASK_TONE: Record<TaskStatus, 'neutral' | 'warning' | 'danger'> = {
+  TODO: 'neutral',
+  IN_PROGRESS: 'neutral',
+  IN_REVIEW: 'warning',
+  BLOCKED: 'danger',
+  DONE: 'neutral',
 }
 
 function StudentOverview() {
   const { data, error, isLoading, refetch } = useGetStudentDashboardQuery()
 
-  if (isLoading) return <PageLoading />
-  if (error || !data) {
-    return <ErrorState message={describeError(error).message} onRetry={refetch} />
-  }
-  return <StudentContent data={data} />
+  return (
+    <section>
+      <div className="page-header dashboard-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p className="muted dashboard-subtitle">Upcoming deadlines, task progress and submissions.</p>
+        </div>
+        <Link className="button-link" to="/projects">
+          View projects
+        </Link>
+      </div>
+
+      {isLoading && <PageLoading />}
+      {!isLoading && (error || !data) && (
+        <ErrorState message={describeError(error).message} onRetry={refetch} />
+      )}
+      {!isLoading && data && <StudentContent data={data} />}
+    </section>
+  )
 }
 
-// Students need to know what is due next, so deadlines lead. Progress and project status follow.
+// Metrics first, then the deadline queue beside task status, then project progress.
 function StudentContent({ data }: { data: StudentDashboard }) {
-  const hasProjects = data.projectsTotal > 0
+  const openTasks = data.tasksTotal - data.tasksDone
 
   return (
     <>
-      <SummaryLine
-        items={[
-          `${data.projectsActive} of ${plural(data.projectsTotal, 'project')} active`,
-          `${data.tasksDone} of ${plural(data.tasksTotal, 'task')} done`,
-          `${plural(data.submissionsAwaitingReview, 'submission')} awaiting review`,
-        ]}
-      />
+      <div className="metric-strip">
+        <MetricTile
+          label="Active projects"
+          value={data.projectsActive}
+          detail={`of ${plural(data.projectsTotal, 'project')}`}
+        />
+        <MetricTile
+          label="Open tasks"
+          value={openTasks}
+          detail={`${data.tasksInProgress} in progress`}
+        />
+        <MetricTile
+          label="Tasks completed"
+          value={`${data.tasksDone} / ${data.tasksTotal}`}
+          detail={
+            <ProgressIndicator percent={data.progressPercent} done={data.tasksDone} total={data.tasksTotal} />
+          }
+        />
+        <MetricTile
+          label="Awaiting review"
+          value={data.submissionsAwaitingReview}
+          detail={`of ${plural(data.submissionsTotal, 'submission')}`}
+        />
+      </div>
 
-      <section className="dashboard-section" aria-labelledby="upcoming-tasks">
-        <h2 id="upcoming-tasks">Next deadlines</h2>
-        {data.upcomingTasks.length === 0 ? (
-          <p className="muted">No open tasks have a due date.</p>
-        ) : (
-          <ul className="deadline-list">
-            {data.upcomingTasks.map((task) => (
-              <li key={task.id}>
-                <span className="deadline-date">{formatDate(task.dueDate)}</span>
-                <span className="deadline-main">
-                  <Link to={`/projects/${task.projectId}`}>{task.title}</Link>
-                  <span className="muted">{TASK_STATUS_LABELS[task.status]}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <div className="dash-columns">
+        <DashboardPanel
+          id="upcoming-tasks"
+          title="Next deadlines"
+          action={
+            <Link className="dash-panel-link" to="/projects">
+              All projects
+            </Link>
+          }
+        >
+          {data.upcomingTasks.length === 0 ? (
+            <p className="muted">No open tasks have a due date.</p>
+          ) : (
+            <ol className="upcoming-list">
+              {data.upcomingTasks.map((task) => {
+                const days = daysUntil(task.dueDate)
+                const date = dayAndMonth(task.dueDate)
+                return (
+                  <li key={task.id} className="upcoming-item">
+                    <time className="upcoming-day" dateTime={task.dueDate}>
+                      <span className="upcoming-day-number">{date.day}</span>
+                      <span className="upcoming-day-month">{date.month}</span>
+                    </time>
+                    <div className="upcoming-body">
+                      <Link to={`/projects/${task.projectId}`}>{task.title}</Link>
+                      <div className="upcoming-meta">
+                        <Badge tone={TASK_TONE[task.status]}>{TASK_STATUS_LABELS[task.status]}</Badge>
+                        <span className={days <= 1 ? 'upcoming-urgent' : undefined}>{dueLabel(days)}</span>
+                      </div>
+                    </div>
+                  </li>
+                )
+              })}
+            </ol>
+          )}
+        </DashboardPanel>
 
-      <section className="dashboard-section" aria-labelledby="recent-projects">
-        <h2 id="recent-projects">Your projects</h2>
-        {!hasProjects ? (
+        <DashboardPanel id="task-status" title="Task status">
+          <StatusDistribution
+            label="Task status"
+            segments={[
+              { label: 'Done', value: data.tasksDone, tone: 'done' },
+              { label: 'In progress', value: data.tasksInProgress, tone: 'progress' },
+              { label: 'In review', value: data.tasksInReview, tone: 'review' },
+              { label: 'To do', value: data.tasksPending, tone: 'todo' },
+              { label: 'Blocked', value: data.tasksBlocked, tone: 'blocked' },
+            ]}
+          />
+        </DashboardPanel>
+      </div>
+
+      <DashboardPanel
+        id="recent-projects"
+        title="Recent projects"
+        full
+        action={
+          <Link className="dash-panel-link" to="/projects">
+            All projects
+          </Link>
+        }
+      >
+        {data.projectsTotal === 0 ? (
           <EmptyState title="No projects yet">
             <p className="muted">Propose a project to start tracking tasks and deadlines.</p>
             <div className="actions">
@@ -123,33 +206,25 @@ function StudentContent({ data }: { data: StudentDashboard }) {
             </div>
           </EmptyState>
         ) : (
-          <ul className="project-progress-list">
+          <ul className="project-cards">
             {data.recentProjects.map((project) => (
-              <li key={project.id}>
-                <div className="project-progress-head">
+              <li key={project.id} className="project-card">
+                <div className="project-card-head">
                   <Link to={`/projects/${project.id}`}>{project.title}</Link>
                   <Badge tone={project.status === 'ARCHIVED' ? 'warning' : 'success'}>
                     {PROJECT_STATUS_LABELS[project.status]}
                   </Badge>
                 </div>
-                <ProgressBar percent={project.progressPercent} />
+                <ProgressIndicator
+                  percent={project.progressPercent}
+                  done={project.taskDone}
+                  total={project.taskTotal}
+                />
               </li>
             ))}
           </ul>
         )}
-      </section>
-
-      <section className="dashboard-section" aria-labelledby="task-breakdown">
-        <h2 id="task-breakdown">Task status</h2>
-        <ProgressBar percent={data.progressPercent} />
-        <ul className="breakdown">
-          <li>To do: {data.tasksPending}</li>
-          <li>In progress: {data.tasksInProgress}</li>
-          <li>In review: {data.tasksInReview}</li>
-          <li>Blocked: {data.tasksBlocked}</li>
-          <li>Done: {data.tasksDone}</li>
-        </ul>
-      </section>
+      </DashboardPanel>
     </>
   )
 }
@@ -157,134 +232,165 @@ function StudentContent({ data }: { data: StudentDashboard }) {
 function FacultyOverview() {
   const { data, error, isLoading, refetch } = useGetFacultyDashboardQuery()
 
-  if (isLoading) return <PageLoading />
-  if (error || !data) {
-    return <ErrorState message={describeError(error).message} onRetry={refetch} />
-  }
-  return <FacultyContent data={data} />
+  return (
+    <section>
+      <div className="page-header dashboard-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p className="muted dashboard-subtitle">Submissions waiting for a decision and the projects you supervise.</p>
+        </div>
+      </div>
+
+      {isLoading && <PageLoading />}
+      {!isLoading && (error || !data) && (
+        <ErrorState message={describeError(error).message} onRetry={refetch} />
+      )}
+      {!isLoading && data && <FacultyContent data={data} />}
+    </section>
+  )
 }
 
-// Faculty come to this page to review, so anything waiting for a decision is the first thing listed.
+// The review queue is the work faculty came to do, so it is the largest panel. Supervised projects sit beside it on desktop.
 function FacultyContent({ data }: { data: FacultyDashboard }) {
   const waiting = data.projects
     .filter((project) => project.awaitingReview > 0)
     .sort((a, b) => b.awaitingReview - a.awaitingReview)
+  // The server lists only the most recent supervised projects, so the queue can be incomplete.
+  const listingIsPartial = data.assignedProjects > data.projects.length
 
   return (
     <>
-      <SummaryLine
-        items={[
-          `${plural(data.submissionsAwaitingReview, 'submission')} awaiting review`,
-          `${data.submissionsReviewed} reviewed`,
-          `${plural(data.assignedProjects, 'supervised project')}, ${data.activeProjects} active`,
-        ]}
-      />
+      <div className="metric-strip metric-strip-three">
+        <MetricTile
+          label="Awaiting review"
+          value={data.submissionsAwaitingReview}
+          detail={`in ${plural(data.projectsNeedingAttention, 'project')}`}
+        />
+        <MetricTile label="Reviewed" value={data.submissionsReviewed} detail="Accepted or changes requested" />
+        <MetricTile
+          label="Active projects"
+          value={data.activeProjects}
+          detail={`of ${plural(data.assignedProjects, 'supervised project')}`}
+        />
+      </div>
 
-      <section className="dashboard-section" aria-labelledby="awaiting-review">
-        <h2 id="awaiting-review">Awaiting your review</h2>
-        {waiting.length === 0 ? (
-          <p className="muted">Nothing is waiting for a decision.</p>
-        ) : (
-          <ul className="review-queue">
-            {waiting.map((project) => (
-              <ReviewRow key={project.id} project={project} />
-            ))}
-          </ul>
-        )}
-      </section>
+      <div className="dash-columns">
+        <DashboardPanel id="review-queue" title="Awaiting your review">
+          {waiting.length === 0 ? (
+            <p className="muted">Nothing is waiting for a decision.</p>
+          ) : (
+            <ul className="review-list">
+              {waiting.map((project) => (
+                <li key={project.id} className="review-item">
+                  <div className="review-item-main">
+                    <Link to={`/projects/${project.id}`}>{project.title}</Link>
+                    <span className="muted">{plural(project.awaitingReview, 'submission')} waiting</span>
+                  </div>
+                  <Link className="button-link primary" to={`/projects/${project.id}#submissions`}>
+                    Review
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          {listingIsPartial && (
+            <p className="muted dash-note">
+              Showing {data.projects.length} of {plural(data.assignedProjects, 'supervised project')}.
+            </p>
+          )}
+        </DashboardPanel>
 
-      <section className="dashboard-section" aria-labelledby="supervised-projects">
-        <h2 id="supervised-projects">Supervised projects</h2>
-        {data.projects.length === 0 ? (
-          <EmptyState title="No supervised projects yet">
-            <p className="muted">An administrator assigns supervisors to projects.</p>
-          </EmptyState>
-        ) : (
-          <ul className="project-progress-list">
-            {data.projects.map((project) => (
-              <li key={project.id}>
-                <div className="project-progress-head">
-                  <Link to={`/projects/${project.id}`}>{project.title}</Link>
-                  <Badge tone={project.status === 'ARCHIVED' ? 'warning' : 'success'}>
-                    {PROJECT_STATUS_LABELS[project.status]}
-                  </Badge>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+        <DashboardPanel id="supervised-projects" title="Supervised projects">
+          {data.projects.length === 0 ? (
+            <EmptyState title="No supervised projects yet">
+              <p className="muted">An administrator assigns supervisors to projects.</p>
+            </EmptyState>
+          ) : (
+            <ul className="supervised-list">
+              {data.projects.map((project) => (
+                <li key={project.id} className="supervised-item">
+                  <div className="supervised-item-head">
+                    <Link to={`/projects/${project.id}`}>{project.title}</Link>
+                    <Badge tone={project.status === 'ARCHIVED' ? 'warning' : 'success'}>
+                      {PROJECT_STATUS_LABELS[project.status]}
+                    </Badge>
+                  </div>
+                  <span className="muted">
+                    {project.awaitingReview > 0
+                      ? `${plural(project.awaitingReview, 'submission')} waiting`
+                      : 'Nothing waiting'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </DashboardPanel>
+      </div>
     </>
-  )
-}
-
-function ReviewRow({ project }: { project: AssignedProject }) {
-  return (
-    <li className="review-row">
-      <span className="review-row-main">
-        <Link to={`/projects/${project.id}`}>{project.title}</Link>
-        <span className="muted">{plural(project.awaitingReview, 'submission')} waiting</span>
-      </span>
-      <Link className="button-link primary" to={`/projects/${project.id}#submissions`}>
-        Review
-      </Link>
-    </li>
   )
 }
 
 function AdminOverview() {
   const { data, error, isLoading, refetch } = useGetAdminDashboardQuery()
 
-  if (isLoading) return <PageLoading />
-  if (error || !data) {
-    return <ErrorState message={describeError(error).message} onRetry={refetch} />
-  }
-  return <AdminContent data={data} />
+  return (
+    <section>
+      <div className="page-header dashboard-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p className="muted dashboard-subtitle">Active accounts and projects across CampusHub.</p>
+        </div>
+        <Link className="button-link primary" to="/admin/users">
+          Manage user accounts
+        </Link>
+      </div>
+
+      {isLoading && <PageLoading />}
+      {!isLoading && (error || !data) && (
+        <ErrorState message={describeError(error).message} onRetry={refetch} />
+      )}
+      {!isLoading && data && <AdminContent data={data} />}
+    </section>
+  )
 }
 
 const ROLES: Role[] = ['STUDENT', 'FACULTY', 'ADMIN']
 const PROJECT_STATUSES: ProjectStatus[] = ['ACTIVE', 'ARCHIVED']
 
+// Only the counts the API returns. There are no trends or term figures, because the service does not compute them.
 function AdminContent({ data }: { data: AdminDashboard }) {
-  const users = ROLES.reduce((sum, role) => sum + data.activeUsersByRole[role], 0)
-  const projects = PROJECT_STATUSES.reduce((sum, status) => sum + data.projectsByStatus[status], 0)
+  const accounts = ROLES.reduce((sum, role) => sum + data.activeUsersByRole[role], 0)
+  const activeProjects = data.projectsByStatus.ACTIVE
+  const archivedProjects = data.projectsByStatus.ARCHIVED
+  const roleRows: CountRow[] = ROLES.map((role) => ({
+    label: ROLE_LABELS[role],
+    value: data.activeUsersByRole[role],
+  }))
+  const statusRows: CountRow[] = PROJECT_STATUSES.map((status) => ({
+    label: PROJECT_STATUS_LABELS[status],
+    value: data.projectsByStatus[status],
+  }))
 
   return (
     <>
-      <SummaryLine
-        items={[
-          `${plural(users, 'active account')}`,
-          `${plural(projects, 'project')}, ${data.projectsByStatus.ACTIVE} active`,
-        ]}
-      />
+      <div className="metric-strip metric-strip-three">
+        <MetricTile label="Active accounts" value={accounts} detail="Students, faculty and administrators" />
+        <MetricTile
+          label="Active projects"
+          value={activeProjects}
+          detail={`of ${plural(activeProjects + archivedProjects, 'project')}`}
+        />
+        <MetricTile label="Archived projects" value={archivedProjects} detail="Not currently active" />
+      </div>
 
-      <p>
-        <Link className="button-link primary" to="/admin/users">
-          Manage user accounts
-        </Link>
-      </p>
-
-      <section className="dashboard-section" aria-labelledby="users-by-role">
-        <h2 id="users-by-role">Active accounts by role</h2>
-        <ul className="breakdown">
-          {ROLES.map((role) => (
-            <li key={role}>
-              {ROLE_LABELS[role]}: {data.activeUsersByRole[role]}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="dashboard-section" aria-labelledby="projects-by-status">
-        <h2 id="projects-by-status">Projects by status</h2>
-        <ul className="breakdown">
-          {PROJECT_STATUSES.map((status) => (
-            <li key={status}>
-              {PROJECT_STATUS_LABELS[status]}: {data.projectsByStatus[status]}
-            </li>
-          ))}
-        </ul>
-      </section>
+      <div className="dash-columns dash-columns-equal">
+        <DashboardPanel id="accounts-by-role" title="Active accounts by role">
+          <CountBreakdown rows={roleRows} />
+        </DashboardPanel>
+        <DashboardPanel id="projects-by-status" title="Projects by status">
+          <CountBreakdown rows={statusRows} />
+        </DashboardPanel>
+      </div>
     </>
   )
 }
