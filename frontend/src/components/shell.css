@@ -341,6 +341,11 @@ button.icon-button.drawer-close {
   .nav-tooltip {
     display: none;
   }
+
+  /* The drawer is always full width, so the collapse control has no meaning here. */
+  .sidebar-foot {
+    display: none;
+  }
 }
 
 /* Topbar */
