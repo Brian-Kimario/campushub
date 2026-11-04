@@ -122,8 +122,6 @@ function UserDirectory() {
         </section>
       )}
 
-      <CreateUserForm onCreated={setIssued} />
-
       <section aria-labelledby="directory-heading">
         <h2 id="directory-heading">Directory</h2>
 
@@ -247,6 +245,8 @@ function UserDirectory() {
           </>
         )}
       </section>
+
+      <CreateUserForm onCreated={setIssued} />
 
       <ConfirmDialog
         open={pending !== null}
