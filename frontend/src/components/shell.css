@@ -1,0 +1,606 @@
+/*
+ * App shell: a graphite sidebar for navigation, a slim topbar for context and account, and one workspace.
+ * Below 768px the sidebar becomes a drawer; between 768px and 1099px it starts compact.
+ */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.app-shell {
+  --sidebar-width: 15.5rem;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  min-height: 100vh;
+  background: var(--bg);
+  transition: grid-template-columns 180ms ease;
+}
+
+.app-shell[data-collapsed='true'] {
+  --sidebar-width: 4.25rem;
+}
+
+.app-workspace {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Sidebar */
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-width: 0;
+  background: var(--graphite-900);
+  color: var(--graphite-text);
+  overflow: visible;
+}
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  height: 3.75rem;
+  padding: 0 0.85rem 0 1rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.07);
+}
+
+.brand-mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 6px;
+  background: var(--graphite-accent);
+  color: var(--graphite-950);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.brand-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 0.9rem 0.6rem;
+}
+
+.nav-group h2.nav-group-label {
+  margin: 0 0.5rem 0.4rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--graphite-muted);
+  white-space: nowrap;
+}
+
+.nav-group + .nav-group {
+  margin-top: 1.25rem;
+}
+
+.nav-group ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  height: 2.4rem;
+  padding: 0 0.6rem;
+  border-radius: 6px;
+  color: var(--graphite-text);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.nav-link:hover {
+  background: var(--graphite-800);
+  color: #ffffff;
+}
+
+.nav-link:focus-visible {
+  outline: 2px solid var(--graphite-accent);
+  outline-offset: -2px;
+}
+
+.nav-link[aria-current='page'] {
+  background: var(--graphite-800);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* The active marker sits on the sidebar's inner edge, so the state reads without relying on color alone. */
+.nav-link[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  left: -0.6rem;
+  top: 0.55rem;
+  bottom: 0.55rem;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--graphite-accent);
+}
+
+.nav-icon {
+  flex: none;
+  color: var(--graphite-muted);
+}
+
+.nav-link:hover .nav-icon,
+.nav-link[aria-current='page'] .nav-icon {
+  color: var(--graphite-accent);
+}
+
+.nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.25rem;
+  height: 1.2rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--graphite-accent);
+  color: var(--graphite-950);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.sidebar-foot {
+  padding: 0.6rem;
+  border-top: 1px solid rgb(255 255 255 / 0.07);
+}
+
+button.collapse-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  height: 2.25rem;
+  padding: 0 0.6rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--graphite-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+button.collapse-toggle:hover:not(:disabled) {
+  background: var(--graphite-800);
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.nav-tooltip {
+  position: absolute;
+  left: calc(100% + 0.6rem);
+  top: 50%;
+  z-index: 30;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-menu);
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 120ms ease;
+}
+
+.nav-link:hover .nav-tooltip,
+.nav-link:focus-visible .nav-tooltip {
+  opacity: 1;
+}
+
+/* Collapsed (desktop and tablet): icons only. Labels stay in the accessibility tree as visually hidden text. */
+@media (min-width: 768px) {
+  .app-shell[data-collapsed='true'] .brand-name,
+  .app-shell[data-collapsed='true'] .nav-label,
+  .app-shell[data-collapsed='true'] .nav-group-label,
+  .app-shell[data-collapsed='true'] .collapse-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .app-shell[data-collapsed='true'] .sidebar-head {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .app-shell[data-collapsed='true'] .nav-link {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .app-shell[data-collapsed='true'] .nav-group + .nav-group {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgb(255 255 255 / 0.07);
+  }
+
+  .app-shell[data-collapsed='true'] .nav-group-label {
+    height: 0;
+    margin: 0;
+  }
+
+  .app-shell[data-collapsed='true'] .nav-count {
+    position: absolute;
+    top: 0.3rem;
+    right: 0.35rem;
+    min-width: 0.5rem;
+    height: 0.5rem;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .app-shell[data-collapsed='true'] .collapse-toggle {
+    justify-content: center;
+    padding: 0;
+  }
+}
+
+/* Drawer (below 768px): the sidebar slides over the page with a backdrop and a close button. */
+/* Matches the .icon-button display rule's specificity so the close button stays hidden on desktop. */
+button.icon-button.drawer-close {
+  display: none;
+}
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  background: rgb(10 12 14 / 0.5);
+}
+
+@media (max-width: 767px) {
+  .app-shell,
+  .app-shell[data-collapsed='true'] {
+    --sidebar-width: 0px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(18rem, 86vw);
+    height: 100dvh;
+    transform: translateX(-104%);
+    transition: transform 200ms ease;
+  }
+
+  .sidebar[data-open='true'] {
+    transform: translateX(0);
+    box-shadow: 0 0 40px rgb(0 0 0 / 0.35);
+  }
+
+  button.icon-button.drawer-close {
+    display: inline-grid;
+    place-items: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--graphite-text);
+  }
+
+  button.drawer-close:hover:not(:disabled) {
+    background: var(--graphite-800);
+    color: #ffffff;
+  }
+
+  .nav-tooltip {
+    display: none;
+  }
+
+  /* The drawer is always full width, so the collapse control has no meaning here. */
+  .sidebar-foot {
+    display: none;
+  }
+}
+
+/* Topbar */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  height: 3.75rem;
+  padding: 0 1.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.topbar-menu {
+  display: none;
+}
+
+.topbar-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.topbar-section {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.topbar-section::after {
+  content: '/';
+  margin-left: 0.5rem;
+  color: var(--border-strong);
+}
+
+.topbar-page {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+button.icon-button,
+.icon-button {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 2.3rem;
+  height: 2.3rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-decoration: none;
+}
+
+button.icon-button:hover:not(:disabled) {
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.notify-link {
+  color: var(--text);
+}
+
+.notify-link.active {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.notify-dot {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.55rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* Profile menu */
+
+.profile-menu {
+  position: relative;
+}
+
+button.profile-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.4rem 0.15rem 0.15rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+button.profile-trigger:hover:not(:disabled),
+button.profile-trigger[aria-expanded='true'] {
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  background: var(--graphite-800);
+  color: var(--graphite-accent);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.profile-chevron {
+  color: var(--muted);
+}
+
+.profile-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 40;
+  width: 15rem;
+  padding: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
+}
+
+.profile-summary {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.55rem 0.6rem 0.65rem;
+  margin-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-summary .muted {
+  font-size: 0.84rem;
+}
+
+.profile-name {
+  font-weight: 600;
+}
+
+.profile-items {
+  display: grid;
+  gap: 2px;
+}
+
+.profile-items + .profile-items {
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--border);
+}
+
+.profile-dropdown [role='menuitem'] {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  height: 2.2rem;
+  padding: 0 0.6rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.9rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.profile-dropdown [role='menuitem'] svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.profile-dropdown [role='menuitem']:hover,
+.profile-dropdown [role='menuitem']:focus-visible {
+  background: var(--surface-muted);
+}
+
+.profile-dropdown [role='menuitem'].menu-signout {
+  color: var(--danger);
+}
+
+.profile-dropdown [role='menuitem'].menu-signout svg {
+  color: var(--danger);
+}
+
+/* Workspace content */
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 2rem 2.25rem 3rem;
+  min-width: 0;
+}
+
+.app-main:focus {
+  outline: none;
+}
+
+@media (max-width: 767px) {
+  .topbar {
+    padding: 0 1rem;
+  }
+
+  .topbar-menu {
+    display: inline-grid;
+  }
+
+  .topbar-section {
+    display: none;
+  }
+
+  .topbar-section::after {
+    display: none;
+  }
+
+  .app-main {
+    padding: 1.5rem 16px 2.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell,
+  .sidebar,
+  .nav-link,
+  .nav-tooltip,
+  .profile-dropdown [role='menuitem'] {
+    transition: none;
+  }
+}

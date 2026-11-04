@@ -7,6 +7,7 @@ import com.campushub.identity.security.JwtTokenService;
 import com.campushub.shared.errors.ApiException;
 import com.campushub.shared.errors.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -47,30 +48,47 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenService tokens;
     private final RevokedTokenRepository revokedTokens;
+    private final RefreshSessionService refreshSessions;
     private final AuditService audit;
     private final TransactionTemplate transactions;
     private final Clock clock;
     private final String decoyHash;
 
     public AuthService(UserAccountRepository users, PasswordEncoder passwordEncoder, JwtTokenService tokens,
-                       RevokedTokenRepository revokedTokens, AuditService audit,
-                       TransactionTemplate transactions, Clock clock) {
+                       RevokedTokenRepository revokedTokens, RefreshSessionService refreshSessions,
+                       AuditService audit, TransactionTemplate transactions, Clock clock) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.tokens = tokens;
         this.revokedTokens = revokedTokens;
+        this.refreshSessions = refreshSessions;
         this.audit = audit;
         this.transactions = transactions;
         this.clock = clock;
         this.decoyHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
-    public LoginResponse login(String email, String password, HttpServletRequest request) {
-        Optional<LoginResponse> response = transactions.execute(status -> attemptLogin(email, password, request));
-        return response.orElseThrow(AuthService::invalidCredentials);
+    /** A new access token and body, plus the refresh token that the controller sets as a cookie. */
+    public record IssuedSession(LoginResponse body, RefreshSessionService.IssuedRefresh refresh) {
     }
 
-    private Optional<LoginResponse> attemptLogin(String rawEmail, String password, HttpServletRequest request) {
+    public IssuedSession login(String email, String password, HttpServletRequest request) {
+        Optional<IssuedSession> session = transactions.execute(status -> attemptLogin(email, password, request));
+        return session.orElseThrow(AuthService::invalidCredentials);
+    }
+
+    /**
+     * Exchanges the refresh cookie for a new access token and a rotated refresh token. The rotation
+     * runs in its own transaction and returns an outcome, so reuse detection commits before the
+     * error is thrown.
+     */
+    public IssuedSession refresh(String refreshToken, HttpServletRequest request) {
+        RefreshSessionService.Rotation rotation = refreshSessions.rotate(refreshToken, request)
+                .orElseThrow(AuthService::unauthenticated);
+        return sessionFor(rotation.account(), rotation.refresh());
+    }
+
+    private Optional<IssuedSession> attemptLogin(String rawEmail, String password, HttpServletRequest request) {
         Instant now = clock.instant();
         Optional<UserAccount> found = users.findByEmail(normalize(rawEmail));
         if (found.isEmpty()) {
@@ -94,7 +112,7 @@ public class AuthService {
                     Map.of("reason", "deactivated"));
             return Optional.empty();
         }
-        if (!passwordEncoder.matches(password, account.getPasswordHash())) {
+        if (!matchesPassword(password, account.getPasswordHash())) {
             if (account.recordFailedLogin(now, MAX_FAILED_ATTEMPTS, LOCKOUT)) {
                 audit.record(ACCOUNT_LOCKED, account.getId(), USER, targetId, AuditOutcome.DENIED, request,
                         Map.of("reason", "too_many_failures"));
@@ -104,10 +122,14 @@ public class AuthService {
             return Optional.empty();
         }
         account.recordSuccessfulLogin();
-        JwtTokenService.IssuedToken token = tokens.issue(account.getId(), account.getRole());
         audit.record(LOGIN_SUCCEEDED, account.getId(), USER, targetId, AuditOutcome.SUCCESS, request, Map.of());
-        return Optional.of(new LoginResponse(token.value(), "Bearer",
-                tokens.accessTtl().toSeconds(), UserSummary.from(account)));
+        return Optional.of(sessionFor(account, refreshSessions.start(account.getId())));
+    }
+
+    private IssuedSession sessionFor(UserAccount account, RefreshSessionService.IssuedRefresh refresh) {
+        JwtTokenService.IssuedToken token = tokens.issue(account.getId(), account.getRole());
+        return new IssuedSession(new LoginResponse(token.value(), "Bearer",
+                tokens.accessTtl().toSeconds(), UserSummary.from(account)), refresh);
     }
 
     @Transactional(readOnly = true)
@@ -117,11 +139,22 @@ public class AuthService {
                 .orElseThrow(AuthService::unauthenticated);
     }
 
-    /** Revokes the presented token by its ID until it would have expired (ADR-019). */
+    /**
+     * Ends the session. The access token is revoked by its ID until it would have expired (ADR-019),
+     * and the refresh family is revoked (ADR-025). Either part may be absent: an expired access token
+     * still lets the user sign out, and a missing cookie still revokes the access token.
+     */
     @Transactional
-    public void logout(AuthenticatedUser caller, HttpServletRequest request) {
-        revokedTokens.save(new RevokedToken(caller.jti(), caller.userId(), caller.expiresAt(), clock.instant()));
-        audit.record(LOGOUT, caller.userId(), USER, caller.userId().toString(), AuditOutcome.SUCCESS, request, Map.of());
+    public void logout(AuthenticatedUser caller, String refreshToken, HttpServletRequest request) {
+        if (caller != null) {
+            revokedTokens.save(new RevokedToken(caller.jti(), caller.userId(), caller.expiresAt(), clock.instant()));
+        }
+        Optional<UUID> refreshOwner = refreshToken == null ? Optional.empty()
+                : refreshSessions.revokeFamilyOf(refreshToken);
+        UUID actor = caller != null ? caller.userId() : refreshOwner.orElse(null);
+        if (actor != null) {
+            audit.record(LOGOUT, actor, USER, actor.toString(), AuditOutcome.SUCCESS, request, Map.of());
+        }
     }
 
     /**
@@ -131,11 +164,11 @@ public class AuthService {
     @Transactional
     public void changePassword(UUID userId, String currentPassword, String newPassword, HttpServletRequest request) {
         UserAccount account = users.findById(userId).orElseThrow(AuthService::unauthenticated);
-        if (!passwordEncoder.matches(currentPassword, account.getPasswordHash())) {
+        if (!matchesPassword(currentPassword, account.getPasswordHash())) {
             throw new ApiException(ErrorCode.INVALID_CREDENTIALS, "The current password is incorrect.");
         }
         List<String> reasons = PasswordPolicy.violations(newPassword);
-        if (reasons.isEmpty() && passwordEncoder.matches(newPassword, account.getPasswordHash())) {
+        if (reasons.isEmpty() && matchesPassword(newPassword, account.getPasswordHash())) {
             reasons = List.of("must differ from the current password");
         }
         if (!reasons.isEmpty()) {
@@ -145,7 +178,18 @@ public class AuthService {
         }
         Instant now = clock.instant();
         account.changePassword(passwordEncoder.encode(newPassword), false, now.truncatedTo(ChronoUnit.SECONDS), now);
+        refreshSessions.revokeAllFor(userId);
         audit.record(PASSWORD_CHANGED, userId, USER, userId.toString(), AuditOutcome.SUCCESS, request, Map.of());
+    }
+
+    /**
+     * BCrypt truncates input at 72 bytes, so a longer candidate could match a stored hash by its
+     * prefix alone. Such a candidate is never a valid password, so it is rejected after the
+     * encoder runs (keeping the timing close to a normal comparison).
+     */
+    private boolean matchesPassword(String candidate, String hash) {
+        boolean matches = passwordEncoder.matches(candidate, hash);
+        return matches && candidate.getBytes(StandardCharsets.UTF_8).length <= PasswordPolicy.MAX_BYTES;
     }
 
     private static String normalize(String email) {

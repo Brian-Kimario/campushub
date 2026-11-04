@@ -48,6 +48,14 @@ public class UserAccount {
     @JdbcTypeCode(SqlTypes.BINARY)
     private UUID departmentId;
 
+    private String program;
+
+    private String cohort;
+
+    private String designation;
+
+    private String bio;
+
     private Instant createdAt;
 
     private Instant updatedAt;
@@ -114,6 +122,39 @@ public class UserAccount {
         this.updatedAt = now;
     }
 
+    /** Deactivates the account and revokes every token issued until now (ADR-017). */
+    public void deactivate(Instant now) {
+        this.status = UserStatus.DEACTIVATED;
+        this.revokedAfter = now;
+        this.updatedAt = now;
+    }
+
+    public void reactivate(Instant now) {
+        this.status = UserStatus.ACTIVE;
+        this.updatedAt = now;
+    }
+
+    /** Sets the institutional ID once, at creation by an administrator. */
+    public void assignInstitutionalId(String institutionalId, Instant now) {
+        this.institutionalId = institutionalId;
+        this.updatedAt = now;
+    }
+
+    /**
+     * Replaces the self-editable profile fields (API_CONTRACT §4). Callers pass the full merged values,
+     * so a null argument clears that field.
+     */
+    public void updateProfile(String displayName, UUID departmentId, String program, String cohort,
+                              String designation, String bio, Instant now) {
+        this.displayName = displayName;
+        this.departmentId = departmentId;
+        this.program = program;
+        this.cohort = cohort;
+        this.designation = designation;
+        this.bio = bio;
+        this.updatedAt = now;
+    }
+
     public UUID getId() {
         return id;
     }
@@ -152,5 +193,25 @@ public class UserAccount {
 
     public UUID getDepartmentId() {
         return departmentId;
+    }
+
+    public String getProgram() {
+        return program;
+    }
+
+    public String getCohort() {
+        return cohort;
+    }
+
+    public String getDesignation() {
+        return designation;
+    }
+
+    public String getBio() {
+        return bio;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
     }
 }

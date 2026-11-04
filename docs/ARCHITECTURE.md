@@ -153,7 +153,7 @@ Denial mapping follows ADR-006: non-members and unrelated users receive 404 for 
 | Modular monolith | ADR-001 |
 | MySQL, Flyway, validation | ADR-002 |
 | Access tokens and transport | ADR-003 |
-| Refresh tokens (deferred) | ADR-004 |
+| Refresh tokens | ADR-025 (supersedes ADR-004) |
 | Password hashing | ADR-005 |
 | Authorization model and denial mapping | ADR-006 |
 | Admin access to private data | ADR-007 |

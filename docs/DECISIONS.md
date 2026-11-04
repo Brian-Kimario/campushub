@@ -19,7 +19,7 @@
 | 001 | Modular monolith on Spring Boot | Accepted | No |
 | 002 | MySQL 8 with forward-only Flyway migrations and real-database tests | Accepted | No |
 | 003 | JWT access tokens with HS256 and 15-minute lifetime | Accepted | No |
-| 004 | Refresh tokens: decided in Phase 2, implemented in P1 | Accepted (deferred implementation) | No |
+| 004 | Refresh tokens: decided in Phase 2, implemented in P1 | Superseded by ADR-025 | No |
 | 005 | Password hashing with BCrypt cost 12 | Accepted | No |
 | 006 | Denial mapping: 404 for invisible objects, 403 for permitted roles failing an object condition | Accepted | No |
 | 007 | No break-glass administrator access to private files in MVP | Accepted | No |
@@ -40,6 +40,7 @@
 | 022 | Team and supervisor policy: team cap of five, eligible supervisors, audited assignment | Accepted | Yes |
 | 023 | Audit log is append-only and every transition is audited in the same transaction | Accepted | Yes |
 | 024 | Late submission off by default, enabled per milestone by the supervisor and audited | Accepted | Yes |
+| 025 | Refresh sessions in an HttpOnly cookie with rotation and family revocation (supersedes ADR-004) | Accepted | Yes |
 
 ## 3. Architecture defaults (ADR-001 to ADR-015)
 
@@ -69,6 +70,7 @@
 - **Context.** Refresh tokens with rotation and reuse detection are valuable but are not needed for the P0 demonstration. The blueprint asks for the decision in Phase 2.
 - **Decision.** MVP issues access tokens only. A user signs in again after 15 minutes. Refresh tokens with rotation and reuse detection are designed here and implemented in P1 (SCOPE §3). The design stores refresh tokens hashed, in a separate table, and revokes the whole family on reuse.
 - **Consequences.** Users are asked to sign in more often during the MVP. The risk is recorded (RISKS R-19).
+- **Status.** Superseded by ADR-025. The session is restored from the refresh cookie after a reload.
 - **Evidence.** SCOPE §3 and §5; SECURITY §3; TEST_STRATEGY §2 (Refresh Session cases are written in P1).
 
 ### ADR-005 Password hashing with BCrypt cost 12
@@ -212,6 +214,13 @@
 - **Decision.** Submissions after a milestone's due date are refused with 422 `DEADLINE_PASSED`. The supervisor can set `allowLate` on a specific milestone. The change is audited, and the submission records that it was late.
 - **Consequences.** A late exception is visible in the audit log and on the submission. The exception is not granted by the student.
 - **Evidence.** NS-06; STATE_MACHINES §5 (V1 preconditions); API_CONTRACT §7.
+
+### ADR-025 Refresh sessions in an HttpOnly cookie with rotation and family revocation (supersedes ADR-004)
+
+- **Context.** Holding the access token in memory only signed the user out on every reload. Storing a long-lived token in localStorage would expose it to any script on the page.
+- **Decision.** Login and refresh set an opaque 32-byte refresh token as an HttpOnly, SameSite=Strict, Secure cookie scoped to `/api/v1/auth`, with an absolute lifetime of 8 hours. The server stores only its SHA-256 hash in `refresh_sessions` (V7). Each refresh rotates the token. Reusing a rotated token revokes its whole family and is audited as `auth.refresh_reuse_detected`. Logout revokes the family and clears the cookie. A password change revokes every family for the user. The cookie endpoints (`/auth/refresh`, `/auth/logout`) require the `X-Requested-With: CampusHub` header. The access token stays in memory and is still a 15-minute JWT (ADR-003). The frontend restores the session once per page load through a single-flight refresh.
+- **Consequences.** A reload keeps the user signed in. Expired access tokens are replaced without a sign-in. The cookie is sent only to the auth path, so the refresh token is not sent on API calls. A rotation that fails returns an empty result, not an exception, so the revocation commits. Expired rows are purged hourly. The Secure flag is on by default. Browsers that refuse Secure cookies on plain-HTTP localhost need `campushub.refresh.cookie-secure=false` for that local run.
+- **Evidence.** API_CONTRACT §2; SECURITY §3; `AuthFlowIntegrationTest` refresh cases; ADR-004 (superseded).
 
 ## 5. Owner decisions that remain open
 

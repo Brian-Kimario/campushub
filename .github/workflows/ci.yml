@@ -1,6 +1,6 @@
 # Pull request and main-branch pipeline (CI_CD §2.1, Phase 1 subset).
-# Phase 1 covers the backend build, tests, and API image build. The secret scan, frontend, E2E,
-# CodeQL, publish, and deploy jobs arrive in the phases that create their code (CI_CD §2).
+# Covers the backend build and tests, the frontend typecheck, build, and lint, and the API image build.
+# The secret scan, E2E, CodeQL, publish, and deploy jobs arrive in the phases that create their code (CI_CD §2).
 # No secrets are used: Testcontainers starts its own MySQL with throwaway credentials.
 
 name: CI
@@ -37,6 +37,29 @@ jobs:
           cache-dependency-path: backend/pom.xml
       - name: Verify (compile, unit tests, Testcontainers MySQL tests)
         run: ./mvnw -B verify
+
+  frontend:
+    name: frontend (typecheck, build, lint)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck and build (tsc -b, vite build)
+        run: npm run build
+      - name: Lint (oxlint)
+        run: npm run lint
 
   image:
     name: api image (build only, no push)

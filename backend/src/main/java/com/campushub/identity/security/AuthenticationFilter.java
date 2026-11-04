@@ -32,7 +32,13 @@ public class AuthenticationFilter extends OncePerRequestFilter {
 
     /** Endpoints a user with a pending forced password change may still call (API_CONTRACT §2). */
     private static final Set<String> PASSWORD_CHANGE_EXEMPT = Set.of(
-            "/auth/me", "/auth/logout", "/auth/change-password");
+            "/api/v1/auth/me", "/api/v1/auth/logout", "/api/v1/auth/change-password");
+
+    /**
+     * Endpoints that must work with an expired or invalid access token (ADR-025). A bad bearer token
+     * here is ignored instead of refused, so sign-out and refresh always reach the controller.
+     */
+    private static final Set<String> SESSION_ENDPOINTS = Set.of("/api/v1/auth/refresh", "/api/v1/auth/logout");
 
     private final JwtTokenService tokens;
     private final UserAccountRepository users;
@@ -65,8 +71,10 @@ public class AuthenticationFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                     caller, null, List.of(new SimpleGrantedAuthority("ROLE_" + caller.role().name()))));
         } catch (ApiException ex) {
-            responder.write(request, response, ex.errorCode(), ex.getMessage());
-            return;
+            if (!SESSION_ENDPOINTS.contains(request.getRequestURI())) {
+                responder.write(request, response, ex.errorCode(), ex.getMessage());
+                return;
+            }
         }
         chain.doFilter(request, response);
     }

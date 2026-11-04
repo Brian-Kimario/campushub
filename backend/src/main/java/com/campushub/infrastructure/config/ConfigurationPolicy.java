@@ -15,7 +15,7 @@ import java.util.function.Function;
 public final class ConfigurationPolicy {
 
     static final int MIN_JWT_SECRET_BYTES = 32;
-    static final int MIN_DEV_SEED_PASSWORD_LENGTH = 12;
+    static final int MIN_DEV_SEED_PASSWORD_LENGTH = 8;
 
     private static final List<String> PLACEHOLDER_PREFIXES = List.of("replace-with-", "change-me");
 

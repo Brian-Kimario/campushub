@@ -46,17 +46,17 @@ For private resources the response to a caller without access is 404 `NOT_FOUND`
 | Method | Path | Auth | Purpose | Success | Errors |
 |---|---|---|---|---|---|
 | POST | `/auth/login` | public | Sign in | 200 `{accessToken, tokenType:"Bearer", expiresIn:900, user}` | 400 `VALIDATION_FAILED`; 401 `INVALID_CREDENTIALS` (also used for locked accounts, see SECURITY §3); 429 `RATE_LIMITED` |
-| POST | `/auth/logout` | any valid token | Revoke current token | 204 | 401 |
+| POST | `/auth/logout` | any token, or none | Revoke the current access token and the refresh family, clear the cookie. Works with an expired access token. Requires `X-Requested-With: CampusHub` | 204 | 400 without the header |
 | GET | `/auth/me` | any valid token | Current user summary | 200 `user` | 401; 403 `PASSWORD_CHANGE_REQUIRED` is not returned here |
 | POST | `/auth/change-password` | any valid token | Change own password | 204 | 400 `VALIDATION_FAILED`; 401 `INVALID_CREDENTIALS` (current password wrong) |
 
 `user` summary: `{id, email, institutionalId, displayName, role, status, mustChangePassword, departmentId}`. Never includes `password_hash` or lockout fields.
 
-Password policy: 12–128 characters; must differ from the last password; rejects values on a bundled list of common passwords (SECURITY §3).
+Password policy: at least 8 characters and at most 72 UTF-8 bytes (the BCrypt input limit, ADR-005; IMPLEMENTATION_LOG §10); must differ from the last password; rejects values on a bundled list of common passwords (SECURITY §3).
 
 Gate: while `mustChangePassword` is true, every endpoint except `/auth/me`, `/auth/logout`, and `/auth/change-password` returns 403 `PASSWORD_CHANGE_REQUIRED`.
 
-Refresh tokens are deferred (ADR-004); no `/auth/refresh` endpoint exists in MVP.
+Refresh sessions (ADR-025, supersedes ADR-004): `POST /auth/login` also sets the `campushub_refresh` cookie (HttpOnly, SameSite=Strict, Path=/api/v1/auth, Secure by default, 8-hour absolute lifetime). `POST /auth/refresh` requires `X-Requested-With: CampusHub`, rotates the cookie, and returns a new access token. A missing or unknown cookie gives 401 `UNAUTHENTICATED`. Reusing a rotated token revokes its whole family. `POST /auth/change-password` clears the cookie and revokes every refresh family for the user.
 
 ## 3. Error model
 
@@ -84,6 +84,7 @@ Refresh tokens are deferred (ADR-004); no `/auth/refresh` endpoint exists in MVP
 | 413 | `FILE_TOO_LARGE` | File over 20 MiB |
 | 422 | `PROPOSAL_INCOMPLETE` | Missing title, description, term, or milestone; `missing[]` lists fields |
 | 422 | `PROJECT_ARCHIVED` | Write to an archived project |
+| 422 | `ROLE_CHANGE_NOT_SUPPORTED` | Admin attempted to change an account's role (MVP; PATCH `/admin/users/{id}`) |
 | 422 | `PROJECT_NOT_EDITABLE` | Project details cannot change in its current state |
 | 422 | `PROJECT_NOT_OPEN_FOR_MEMBERSHIP` | Invitation or join on a completed or archived project |
 | 422 | `SUPERVISOR_NOT_ELIGIBLE` | Supervisor is not an active faculty user |
@@ -110,10 +111,11 @@ Problem type URI: `urn:campushub:problem:<code lower-kebab>`, e.g. `urn:campushu
 | GET | `/users/{id}` | see matrix | Public profile card | Name, role, department. 404 if not permitted |
 | GET | `/admin/users` | ADMIN | List with `role`, `status`, `q` (email/name prefix) | Paginated; sort allowlist: `displayName`, `email`, `createdAt` |
 | POST | `/admin/users` | ADMIN | Create account | Body: `email`, `institutionalId?`, `displayName`, `role`, `departmentId?`. Returns 201 with `temporaryPassword` shown once |
-| POST | `/admin/users/{id}/deactivate` | ADMIN | Deactivate (ADR-017) | 200; writes audit; 422 if the user is the last ADMIN |
+| POST | `/admin/users/{id}/deactivate` | ADMIN | Deactivate (ADR-017) | 200; revokes existing tokens; writes audit; 422 `PRECONDITION_NOT_MET` for the caller's own account or the last active ADMIN |
 | POST | `/admin/users/{id}/reactivate` | ADMIN | Reactivate | 200 |
 | POST | `/admin/users/{id}/reset-password` | ADMIN | New temporary password | 201 with `temporaryPassword`; sets `mustChangePassword=true`; revokes existing tokens |
 | PATCH | `/admin/users/{id}` | ADMIN | Edit profile fields and `departmentId` | Role change returns 422 `ROLE_CHANGE_NOT_SUPPORTED` in MVP |
+| GET | `/users/faculty` | ADMIN | Active faculty for choosing a supervisor | MVP addition, not in the full contract. Returns a plain array of `{id, displayName}`, unpaginated (IMPLEMENTATION_LOG §11). Other roles get 403 `FORBIDDEN_ROLE` |
 
 ## 5. Catalog endpoints
 
@@ -125,12 +127,22 @@ Problem type URI: `urn:campushub:problem:<code lower-kebab>`, e.g. `urn:campushu
 | POST | `/admin/catalog/departments` | ADMIN | Create; 409 `DUPLICATE` on code |
 | PATCH | `/admin/catalog/departments/{id}` | ADMIN | Update name or active |
 | DELETE | `/admin/catalog/departments/{id}` | ADMIN | Delete only if unreferenced; else 409 `CATALOG_ITEM_IN_USE` (FR-CAT-03) |
-| POST/PATCH/DELETE | `/admin/catalog/terms[/{id}]` | ADMIN | Same rules; `endsOn > startsOn` (422 `VALIDATION_FAILED`) |
+| POST/PATCH/DELETE | `/admin/catalog/terms[/{id}]` | ADMIN | Same rules; `endsOn > startsOn` checked on the merged dates (400 `VALIDATION_FAILED`, field `endsOn`) |
 | POST/PATCH/DELETE | `/admin/catalog/courses[/{id}]` | ADMIN | Same rules |
 
 Catalog GET responses are cached (ADR-010). Every admin write evicts the affected cache name.
 
 ## 6. Project endpoints
+
+**MVP subset (Stage 1, IMPLEMENTATION_LOG §11).** Only the rows below are implemented. Everything else in this section is deferred and must not be documented as available. Deviations from the full rows:
+
+- Project status is `ACTIVE` or `ARCHIVED` only. There is no DRAFT, PROPOSED, APPROVED, REJECTED, or COMPLETED state, so the lifecycle endpoints (`submit-proposal`, `revise`, `approve`, `reject`, `activate`, `complete`) are not implemented.
+- `POST /projects` takes `title`, `description?`, `subject?`, `startDate?`, `dueDate?`. `termId` and `courseId` are not implemented. `dueDate` before `startDate` returns 422 `VALIDATION_FAILED` with field `dueDate`. Create is 400 `VALIDATION_FAILED` for invalid input, and is STUDENT only.
+- `PATCH /projects/{id}` is owner-only and works on `ACTIVE` projects. Full-field semantics: an omitted optional field is cleared. Stale `version` returns 409 `STALE_VERSION`; an archived project returns 422 `PROJECT_ARCHIVED`, which is checked before the version.
+- `PUT /projects/{id}/supervisor` takes `{supervisorId, version}`. It is ADMIN only, and the supervisor must be an active FACULTY account.
+- `POST /projects/{id}/archive` is ADMIN only, takes `{version}`, and moves `ACTIVE` to `ARCHIVED`. Archived projects are read-only.
+- The `GET /projects` filter is `status` only. `termId`, `role`, and `supervisorId` filters are not implemented. Sort is `createdAt,desc` with `id,desc` as the tie-breaker. Invalid `status` or `size` values return 400 `VALIDATION_FAILED`.
+- A malformed `{id}` path value returns 404 `NOT_FOUND`, the same as a missing one.
 
 | Method | Path | Who | Purpose | Success | Notes |
 |---|---|---|---|---|---|
@@ -152,14 +164,14 @@ Catalog GET responses are cached (ADR-010). Every admin write evicts the affecte
 | Method | Path | Who | Purpose | Notes |
 |---|---|---|---|---|
 | GET | `/projects/{id}/members` | member, supervisor, admin | List | Basic profile fields only |
-| DELETE | `/projects/{id}/members/{userId}` | owner | Remove member | 204; cannot remove owner (422 `PRECONDITION_NOT_MET`); unassigns their open tasks in the same transaction |
-| POST | `/projects/{id}/invitations` | owner | Invite | 201; body `inviteeId`; invitee must be ACTIVE STUDENT; 409 `TEAM_FULL`; 409 `DUPLICATE` if already a member or PENDING |
-| GET | `/projects/{id}/invitations` | owner, ADMIN | List | Paginated |
+| DELETE | `/projects/{id}/members/{userId}` | owner | Remove member | 204; cannot remove owner (422 `PRECONDITION_NOT_MET`). Removal revokes access at once. Tasks have no assignee in the MVP (V5), so removal has no task side effects; the earlier wording about unassigning tasks does not apply |
+| POST | `/projects/{id}/invitations` | owner | Invite | 201; **deviation:** body carries `inviteeEmail`, not `inviteeId`; the invitee must be an ACTIVE STUDENT (otherwise 400 `VALIDATION_FAILED` on `inviteeEmail`); 409 `TEAM_FULL`; 409 `DUPLICATE` if already a member or PENDING |
+| GET | `/projects/{id}/invitations` | owner | List | Paginated. **Deviation:** ADMIN does not see invitation lists in this build |
 | GET | `/invitations/mine` | STUDENT | Own invitations | Paginated; `status` filter |
 | POST | `/invitations/{id}/accept` | invitee | Accept | 200; creates membership in one transaction; 409 `TEAM_FULL`; 422 `PROJECT_NOT_OPEN_FOR_MEMBERSHIP`; 404 for non-invitee |
 | POST | `/invitations/{id}/decline` | invitee | Decline | 200; 404 for non-invitee |
 
-Invitations expire 14 days after creation. Expiry is applied on read and by an hourly job (DATA_MODEL §5.3).
+Invitations expire 14 days after creation. Expiry is derived on read; the hourly expiry job in DATA_MODEL §5.3 is not built yet.
 
 ## 7. Milestone endpoints
 
@@ -184,13 +196,15 @@ Invitations expire 14 days after creation. Expiry is applied on read and by an h
 
 Task `status` is never writable through `PATCH /tasks/{id}`; sending it there returns 400 `FIELD_NOT_EDITABLE` (FR-TASK-03).
 
+**MVP subset (IMPLEMENTATION_LOG §11, Stage 2).** Implemented: list (filter `status` only; sort `createdAt,asc`, `id,asc`), create (owner only; default priority `MEDIUM`; archived project → 422 `PROJECT_ARCHIVED`, not `PROJECT_NOT_EDITABLE`), detail, PATCH (owner only; `title`, `description`, `priority`, `dueDate`; `version` required), and transitions (owner only; `blockedReason` required for `BLOCKED` and cleared on any other transition; an illegal or same-state move → 409 `INVALID_TRANSITION`). Deviations: the request field is `dueDate`, not `dueAt`; `assigneeId`, `milestoneId`, `dueBefore`, and the comment endpoints are not built. The assignee role is absent, so the owner performs every transition.
+
 ## 9. Calendar
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
-| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | any authenticated | Milestones (`type: MILESTONE_DUE`) and tasks (`type: TASK_DUE`) visible to the caller |
+| GET | `/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | any authenticated | Project due dates (`type: PROJECT_DUE`) and task due dates (`type: TASK_DUE`) visible to the caller |
 
-Rules: `from` and `to` required; `to >= from`; range ≤ 92 days (400 `RANGE_TOO_LARGE`). Items carry UTC instants; the client converts to the user's time zone (ADR-013). Visibility: a student sees items in projects where they are members and tasks assigned to them; faculty sees supervised projects; admins see all.
+Rules: `from` and `to` required; `to >= from` (otherwise 400 `VALIDATION_FAILED`); range ≤ 92 days (400 `RANGE_TOO_LARGE`). **Deviations:** milestones are not in the schema, so there is no `MILESTONE_DUE` type; items carry a `date` as a calendar day (`LocalDate`, no zone shift), not UTC instants. Visibility uses the same project visibility rule as the rest of the API: a project or task appears only when its project is visible to the caller. Admins see all.
 
 ## 10. Submission and review endpoints
 
@@ -207,6 +221,8 @@ Rules: `from` and `to` required; `to >= from`; range ≤ 92 days (400 `RANGE_TOO
 | POST | `/submission-versions/{versionId}/review` | supervisor | Record decision | 201 | Body `decision`, `feedback?`; 422 `FEEDBACK_REQUIRED`; 409 `REVIEW_EXISTS`; requires UNDER_REVIEW (409 `INVALID_TRANSITION` otherwise) |
 | GET | `/submission-files/{fileId}/download` | member, supervisor, admin (see matrix) | Stream bytes | 200 | `Content-Disposition: attachment`; `X-Content-Type-Options: nosniff`; each download audited. Unauthorized → 404 (NS-12) |
 
+**MVP subset (IMPLEMENTATION_LOG §11, Stage 3).** Built under project-scoped paths instead of the milestone and version paths above: `POST /projects/{id}/submissions` (owner only; 201; creates revision 1, or the next revision only after CHANGES_REQUESTED, else 409 `INVALID_TRANSITION`; archived project → 422 `PROJECT_ARCHIVED`), `GET /projects/{id}/submissions` (unpaginated, ordered by `revisionNo` ascending), `GET /submissions/{id}`, `POST /submissions/{id}/review/start` (faculty supervisor only; SUBMITTED → UNDER_REVIEW; 200), and `POST /submissions/{id}/review` (faculty supervisor only; body `{decision, feedback?}`; 201). The review rules are: an admin gets 403 `FORBIDDEN_ROLE`; a non-supervisor faculty member or an invisible project gets 404; a decision on a decided submission gets 409 `REVIEW_EXISTS`; a decision before the review starts gets 409 `INVALID_TRANSITION`; CHANGES_REQUESTED without non-blank feedback gets 422 `FEEDBACK_REQUIRED`. Evidence files use project-scoped paths too: `POST /submissions/{id}/files` (multipart `file`; students who can write team work, meaning the owner or an accepted member; faculty get 403 `FORBIDDEN_ROLE`; SUBMITTED revisions only; 201; 413 `FILE_TOO_LARGE` above 20 MiB; 422 `FILE_TYPE_NOT_ALLOWED` or `FILE_LIMIT_EXCEEDED` above five files per revision; 409 `VERSION_SEALED` once review starts), `GET /submissions/{id}/files` (ordered by `uploadedAt`), and `GET /submissions/{id}/files/{fileId}/content` (attachment with `nosniff`; audited). Admins get 404 on all three. The table above lists the milestone-scoped and version-scoped paths, which were not built. Deviations: there is no DRAFT, no version-create endpoint, and no milestone scope. A submission is a single revision row with a `https://` link instead of files. Submission reviews are blocked on archived projects (422 `PROJECT_ARCHIVED`). Revision and review checks run after the archived check and before any write.
+
 Admin download: ADMIN has no path to student submission files in MVP (ADR-007). `GET /submission-files/{fileId}/download` returns 404 for administrators on submission files. Administrators can still see audit metadata about submissions.
 
 ## 11. Skills and certifications (P1)
@@ -217,11 +233,16 @@ Admin download: ADMIN has no path to student submission files in MVP (ADR-007). 
 | POST | `/admin/skills` | ADMIN | Add skill | 409 `DUPLICATE` on normalized name |
 | GET | `/users/me/skills` | STUDENT | Own skills | |
 | PUT | `/users/me/skills` | STUDENT | Replace full set atomically | Body: `[{skillId, proficiency, evidenceNote?}]`; max 50 entries |
-| GET | `/users/me/certifications` | owner | List own | Paginated |
-| POST | `/users/me/certifications` | owner | Create | 201; `credentialUrl` must be `https` (422 `VALIDATION_FAILED`) |
-| DELETE | `/users/me/certifications/{id}` | owner | Delete with file | 204; audited; 404 for non-owners |
-| POST | `/users/me/certifications/{id}/file` | owner | Upload evidence | 201; same validation as submission files |
-| GET | `/users/me/certifications/{id}/file` | owner | Download evidence | 200 attachment; 404 otherwise |
+| GET | `/users/me/certifications` | STUDENT | List own | Paginated |
+| POST | `/users/me/certifications` | STUDENT | Create | 201; body `title`, `issuer`, `issuedOn`, `expiresOn?`, `credentialId?` (max 100), `credentialUrl?` (must be `https`) |
+| PUT | `/users/me/certifications/{id}` | STUDENT | Edit own | 200; body as create plus `version`; stale `version` → 409 `STALE_VERSION`; `expiresOn` before `issuedOn` → 400 `VALIDATION_FAILED`; audited as `certification.updated`; 404 for non-owners |
+| DELETE | `/users/me/certifications/{id}` | STUDENT | Delete own | 204; audited; 404 for non-owners |
+| POST | `/users/me/certifications/{id}/file` | owner | Upload evidence | Not built in Phase 7a; see the MVP subset note |
+| GET | `/users/me/certifications/{id}/file` | owner | Download evidence | Not built in Phase 7a; see the MVP subset note |
+
+**MVP subset (Phase 7a and 9.1).** Certifications are STUDENT-only: other roles get 403 `FORBIDDEN_ROLE`. A non-https `credentialUrl` returns 400 `VALIDATION_FAILED`, the same status as every other field-value error on the API. The 422 status listed earlier for this rule was a planning error and is superseded here. Evidence file upload and download are deferred and are not implemented.
+
+**Dashboards (Phase 10).** The implemented MVP endpoints are `GET /users/me/dashboard/student` (STUDENT) and `GET /users/me/dashboard/faculty` (FACULTY). Any other role gets 403 `FORBIDDEN_ROLE`, and no token gets 401. The metrics are defined in the list below. `progressPercent` is DONE tasks over all tasks, or `null` when a student has no tasks, so an empty project never reads as complete. The admin dashboard and the `/dashboard/*` paths in the table below are not built.
 
 ## 12. Dashboards (read-only aggregates)
 
