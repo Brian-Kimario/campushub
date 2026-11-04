@@ -12,12 +12,12 @@ import org.springframework.data.domain.Sort;
  * Parses the catalog {@code sort} parameter, {@code field,asc} or {@code field,desc}. Only the fields in the
  * caller's allowlist are accepted, and {@code id} is always the tie-breaker (FR-CAT-02).
  */
-final class CatalogSort {
+public final class CatalogSort {
 
     private CatalogSort() {
     }
 
-    static Sort parse(String raw, String defaultField, Set<String> allowed) {
+    public static Sort parse(String raw, String defaultField, Set<String> allowed) {
         if (raw == null || raw.isBlank()) {
             return Sort.by(Sort.Direction.ASC, defaultField, "id");
         }
@@ -34,7 +34,7 @@ final class CatalogSort {
     }
 
     /** The sort as applied, for the list envelope in API_CONTRACT §1.1. */
-    static List<String> applied(Sort sort) {
+    public static List<String> applied(Sort sort) {
         return sort.stream()
                 .map(order -> order.getProperty() + "," + order.getDirection().name().toLowerCase(Locale.ROOT))
                 .toList();

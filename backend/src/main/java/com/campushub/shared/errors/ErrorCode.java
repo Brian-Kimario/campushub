@@ -29,6 +29,7 @@ public enum ErrorCode {
     PROJECT_NOT_OPEN_FOR_MEMBERSHIP(HttpStatus.UNPROCESSABLE_ENTITY, "Project is not open for membership"),
     RANGE_TOO_LARGE(HttpStatus.BAD_REQUEST, "Date range too large"),
     PROJECT_ARCHIVED(HttpStatus.UNPROCESSABLE_ENTITY, "Project is archived"),
+    ROLE_CHANGE_NOT_SUPPORTED(HttpStatus.UNPROCESSABLE_ENTITY, "Role change is not supported"),
     SUPERVISOR_NOT_ELIGIBLE(HttpStatus.UNPROCESSABLE_ENTITY, "Supervisor not eligible"),
     REVIEW_EXISTS(HttpStatus.CONFLICT, "Review already recorded"),
     FEEDBACK_REQUIRED(HttpStatus.UNPROCESSABLE_ENTITY, "Feedback required"),
