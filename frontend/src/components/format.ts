@@ -49,3 +49,12 @@ export const SUBMISSION_STATUS_LABELS: Record<SubmissionStatus, string> = {
   CHANGES_REQUESTED: 'Changes requested',
   ACCEPTED: 'Accepted',
 }
+
+// Initials are the only avatar source the API provides. They fall back to "?" for an empty name.
+export function initialsFor(displayName: string): string {
+  const parts = displayName.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  const first = parts[0][0]
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : ''
+  return (first + last).toUpperCase()
+}
